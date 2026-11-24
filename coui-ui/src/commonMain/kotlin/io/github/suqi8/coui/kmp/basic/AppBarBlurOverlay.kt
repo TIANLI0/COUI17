@@ -77,11 +77,9 @@ object AppBarBlurOverlayDefaults {
     val ScrollAlphaThresholdDp = 30f
 
     /**
-     * The dark-theme material base colour: `coui_color_background_with_card` in night mode, `#000000`,
-     * as the ColorOS 17 COUI SDK declares it for pages that carry cards (cards at `#1AFFFFFF` then
-     * read as `#1A1A1A`).
+     * The dark-theme material base colour.
      *
-     * History: this used to be `#303030`. The dark page background rendered as a flat `48 / 48 / 48`, measured across whole
+     * The dark page background renders as a flat `48 / 48 / 48` (`#303030`), measured across whole
      * pages on two native surfaces. `#303030` is also the platform's own dark background
      * (`background_material_dark` → `material_grey_850` = `#ff303030`), so it is a colour the
      * platform declares, not one inferred from a screenshot mean. The material's top edge over a
@@ -93,7 +91,7 @@ object AppBarBlurOverlayDefaults {
      * itself. The rendered value is used here instead, with the light-sensing glass's own alpha ramp
      * doing the rest.
      */
-    val DarkContainerColor = Color(0xFF000000)
+    val DarkContainerColor = Color(0xFF303030)
 
     /**
      * The material base colour for the current theme: the light theme's `surface`, which is
