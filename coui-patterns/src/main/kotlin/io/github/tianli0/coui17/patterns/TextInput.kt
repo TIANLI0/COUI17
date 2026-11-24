@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.Dp
 import io.github.suqi8.coui.kmp.basic.TextField
 import io.github.suqi8.coui.kmp.basic.TextFieldDefaults
 import io.github.suqi8.coui.kmp.basic.TextFieldMode
@@ -47,6 +48,13 @@ fun TextInput(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     /** The fill of the field; by default the card colour on the page colour, none on a card or dialog. */
     containerColor: Color = if (LocalOnPageColor.current) COUITheme.colorScheme.surfaceContainer else Color.Transparent,
+    /**
+     * On the page colour the field is a card among the group cards and takes their corner radius;
+     * inside a card or a dialog it keeps COUI's own field radius.
+     */
+    cornerRadius: Dp = if (LocalOnPageColor.current) PageDefaults.FieldCornerRadius else TextFieldDefaults.CornerRadius,
+    /** A password field: dots, with the eye key that reveals the text. */
+    showPasswordToggle: Boolean = false,
 ) {
     var tfv by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
     // Only adopt the external value when the OWNER changed it (e.g. cleared after send); our own
@@ -65,6 +73,8 @@ fun TextInput(
         modifier = modifier,
         backgroundMode = TextFieldMode.Rectangle,
         colors = TextFieldDefaults.textFieldColors(backgroundColor = containerColor),
+        cornerRadius = cornerRadius,
+        showPasswordToggle = showPasswordToggle,
         label = label,
         singleLine = singleLine,
         maxLines = maxLines,

@@ -85,7 +85,7 @@ fun InputPill(
             Modifier
                 .weight(1f)
                 .heightIn(min = ComposerKeySize)
-                .glassSurface(RoundedCornerShape(ComposerKeySize / 2))
+                .glassSurface(RoundedCornerShape(ComposerKeySize / 2), halo = true)
                 .padding(horizontal = 16.dp, vertical = 9.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -143,7 +143,7 @@ fun ComposerKey(
     )
 }
 
-/** A 48dp round glass button floating over content (jump to latest, interrupt). */
+/** A 48dp round glass button floating over content (close a viewer, download), with the toolbar halo. */
 @Composable
 fun RoundIconButton(
     icon: ImageVector,
@@ -156,7 +156,7 @@ fun RoundIconButton(
     Box(
         modifier
             .size(48.dp)
-            .glassSurface(CircleShape)
+            .glassSurface(CircleShape, halo = true)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,

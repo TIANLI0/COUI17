@@ -22,3 +22,5 @@ First release as a standalone repository.
 - A gallery application.
 - Maven publications `io.github.tianli0.coui17:<module>` (local repository).
 - CI, and a daily workflow that follows upstream and merges it when it is safe to.
+- One corner radius per container for text fields (`PageDefaults.FieldCornerRadius` on the page
+  colour) and one shadow for floating controls (`Modifier.floatingHalo`, `glassSurface(halo = true)`).

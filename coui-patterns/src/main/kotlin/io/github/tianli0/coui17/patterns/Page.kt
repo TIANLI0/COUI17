@@ -74,6 +74,12 @@ object PageDefaults {
     /** Gap under a group card. */
     val GroupSpacing = 16.dp
 
+    /**
+     * Corner radius of a text field that sits on the page colour as a card of its own: the group
+     * card's radius, so a field between two cards has the same corners as they do.
+     */
+    val FieldCornerRadius = CardDefaults.GroupCornerRadius
+
     /** How far the strong header material reaches below a small title bar while it fades out. */
     internal val HeaderFade = 16.dp
 }

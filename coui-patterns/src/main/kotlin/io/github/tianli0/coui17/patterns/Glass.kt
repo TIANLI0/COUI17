@@ -10,12 +10,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.BottomFloatingToolbarDefaults
 import io.github.suqi8.coui.kmp.basic.couiGlassSurface
@@ -44,10 +47,11 @@ val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
  * glass stays dark over white text in the dark theme and light over dark text in the light one (a
  * plain alpha tint lets bright content through and reads as a light-grey slab in dark mode).
  * [tint] adds a state's colour on top. A hairline rim, clipped to [shape]. Without a
- * [LocalGlassBackdrop] it is the opaque card colour.
+ * [LocalGlassBackdrop] it is the opaque card colour. [halo] adds the [floatingHalo] under it: for
+ * the controls of a floating toolbar (its keys and its field), not for small capsules in a header.
  */
 @Composable
-fun Modifier.glassSurface(shape: Shape, tint: Color? = null): Modifier {
+fun Modifier.glassSurface(shape: Shape, tint: Color? = null, halo: Boolean = false): Modifier {
     val scheme = COUITheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
     val fill = tint?.compositeOver(scheme.surfaceContainer) ?: scheme.surfaceContainer
@@ -57,6 +61,7 @@ fun Modifier.glassSurface(shape: Shape, tint: Color? = null): Modifier {
         if (tint != null) base + BlendColorEntry(color = tint) else base
     }
     return this
+        .then(if (halo) Modifier.floatingHalo(shape) else Modifier)
         .couiGlassSurface(
             backdrop = LocalGlassBackdrop.current,
             shape = shape,
@@ -102,4 +107,25 @@ fun Modifier.glassHeader(containerColor: Color, holdFraction: Float): Modifier {
             1f to containerColor.copy(alpha = 0f),
         ),
     )
+}
+
+/**
+ * The one shadow of a floating control: the soft halo of ColorOS 17's toolbar keys (the title
+ * bar's back key, the panel's close capsule) — 16dp of blur, 6dp down, 12 % black on a light page
+ * and a faint 5 % white glow on a dark one. Use it for anything that floats over content instead
+ * of an elevation shadow, so every floating control casts the same light. Apply it before the
+ * modifier that clips the control.
+ */
+@Composable
+fun Modifier.floatingHalo(shape: Shape): Modifier {
+    val dark = COUITheme.colorScheme.background.luminance() < 0.5f
+    val shadow = remember(dark) {
+        Shadow(
+            radius = 16.dp,
+            color = if (dark) Color.White else Color.Black,
+            offset = DpOffset(0.dp, 6.dp),
+            alpha = if (dark) 0.05f else 0.12f,
+        )
+    }
+    return dropShadow(shape, shadow)
 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -121,7 +122,8 @@ private fun SheetConfirmCapsule(confirm: SheetConfirm) {
         minHeight = BottomSheetDefaults.ActionButtonSize,
         minWidth = 60.dp,
         insideMargin = PaddingValues(horizontal = 16.dp),
-        modifier = if (confirm.testTag != null) Modifier.testTag(confirm.testTag) else Modifier,
+        modifier = (if (confirm.testTag != null) Modifier.testTag(confirm.testTag) else Modifier)
+            .then(if (confirm.enabled) Modifier.floatingHalo(CircleShape) else Modifier),
     ) {
         Text(
             confirm.text,
