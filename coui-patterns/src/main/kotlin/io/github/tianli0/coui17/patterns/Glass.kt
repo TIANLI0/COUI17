@@ -73,13 +73,23 @@ fun Modifier.glassSurface(
     val fill = tint?.compositeOver(scheme.surfaceContainer) ?: scheme.surfaceContainer
     val rim = if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.06f)
     val density = LocalDensity.current
-    val stroke = if (circle) MaterialStrokeParams.frameworkCircle1(dark) else MaterialStrokeParams.frameworkCapsule1(dark)
+    // A capsule here can be a field that grows lines. The inner fade is sized from the control's
+    // width and height, so on a tall field it drew a large ellipse inside it (seen on the device):
+    // capsules keep the rim line only, circles keep their fade.
+    val stroke = if (circle) {
+        MaterialStrokeParams.frameworkCircle1(dark)
+    } else {
+        MaterialStrokeParams.frameworkCapsule1(dark).copy(shadowFadeIn = 0f, shadowFadeOut = 0f)
+    }
     val layers = remember(dark, tint) {
         val base = if (dark) BottomFloatingToolbarDefaults.BlurColorsDark else BottomFloatingToolbarDefaults.BlurColorsLight
         if (tint != null) base + BlendColorEntry(color = tint) else base
     }
+    // Blur and tint only. The session page's floating controls (composer, keys, capsules, the
+    // "back to latest" pill) read as one sheet of frosted glass over the conversation: no rim line,
+    // no inner fade and no shadow, which over running text looked like borders and halos (the
+    // user's call). [halo] is kept for source compatibility and draws nothing.
     return this
-        .then(if (halo) Modifier.floatingHalo(shape) else Modifier)
         .couiGlassSurface(
             backdrop = LocalGlassBackdrop.current,
             shape = shape,
@@ -87,17 +97,6 @@ fun Modifier.glassSurface(
             fallback = Modifier.clip(shape).background(fill),
             blurRadius = 24f,
             blendColors = layers,
-        )
-        .materialShadowEdge(
-            stroke = stroke,
-            fallback = Modifier.border(0.5.dp, rim, shape),
-            // The rim follows the control's own corners (a field that grows a line is no capsule).
-            cornerRadiusFor = { w, h ->
-                when (val o = shape.createOutline(Size(w, h), LayoutDirection.Ltr, density)) {
-                    is Outline.Rounded -> o.roundRect.topLeftCornerRadius.x
-                    else -> h / 2f
-                }
-            },
         )
         .clip(shape)
 }

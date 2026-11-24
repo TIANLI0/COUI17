@@ -42,11 +42,12 @@ fun ExpandArrow(
     modifier: Modifier = Modifier,
     tint: Color = COUITheme.colorScheme.onSurfaceSecondary,
     contentDescription: String? = null,
+    durationMillis: Int = ExpandArrowDefaults.DurationMillis,
 ) {
     val rotation = animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = tween(
-            durationMillis = ExpandArrowDefaults.DurationMillis,
+            durationMillis = durationMillis,
             easing = ExpandArrowDefaults.Easing,
         ),
         label = "ExpandArrowRotation",

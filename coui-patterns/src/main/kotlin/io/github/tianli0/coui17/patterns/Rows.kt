@@ -117,7 +117,7 @@ fun CollapsibleRow(
         }
         Spacer(Modifier.size(6.dp))
         trailing()
-        if (showArrow) ExpandArrow(expanded = expanded)
+        if (showArrow) ExpandArrow(expanded = expanded, durationMillis = EXPAND_MS)
     }
 }
 

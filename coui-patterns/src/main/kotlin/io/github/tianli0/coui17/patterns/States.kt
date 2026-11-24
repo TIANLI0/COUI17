@@ -163,5 +163,9 @@ fun ExpandBody(expanded: Boolean, modifier: Modifier = Modifier, content: @Compo
     }
 }
 
-private const val EXPAND_MS = 400
+/**
+ * COUI's expandable list takes 400ms; on a phone with many rows to open that read as slow, so the
+ * same curve runs in 300ms here, and the row's arrow turns in the same time.
+ */
+internal const val EXPAND_MS = 300
 private val ExpandEasing = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0f, 0.1f, 1f)

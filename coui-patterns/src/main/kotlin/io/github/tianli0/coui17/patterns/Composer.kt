@@ -34,7 +34,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
+import io.github.suqi8.coui.kmp.basic.couiTouchMotion
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.RotatingProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Text
@@ -133,12 +133,16 @@ fun ComposerKey(
     enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    HighlightedIconButton(
-        onClick = onClick,
-        modifier = modifier.semantics { contentDescription = label },
-        size = ComposerKeySize,
-        enabled = enabled,
-        backdrop = LocalGlassBackdrop.current,
+    // The same frosted glass as the field beside it: blur only, no rim, halo or press light; the
+    // press keeps COUI's touch motion (scale), so the key still answers the finger.
+    Box(
+        modifier
+            .size(ComposerKeySize)
+            .couiTouchMotion(shape = CircleShape, enabled = enabled, lightEnabled = false)
+            .glassSurface(CircleShape)
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, indication = null, interactionSource = null, onClick = onClick)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
         content = content,
     )
 }
