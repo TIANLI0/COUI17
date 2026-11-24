@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -147,7 +148,10 @@ fun InfoChip(
     // A floating chip lies on its page's header material, which already blurs what scrolls beneath:
     // a second blur per chip only cost frames. It is a translucent card fill (plus the state tint).
     val surface = if (backdrop != null) {
-        Modifier.clip(shape).background(scheme.surfaceContainer.copy(alpha = FLOATING_CHIP_ALPHA)).then(if (tint != null) Modifier.background(tint) else Modifier)
+        // The card colour is itself translucent in the dark theme (10 % white): composite it on the
+        // page first, then make that translucent. Replacing its alpha turned the chips light grey.
+        val card = scheme.surfaceContainer.compositeOver(pageContainerColor().compositeOver(scheme.background))
+        Modifier.clip(shape).background(card.copy(alpha = FLOATING_CHIP_ALPHA)).then(if (tint != null) Modifier.background(tint) else Modifier)
     } else {
         Modifier.clip(shape).background(tint ?: scheme.surfaceContainer)
     }
