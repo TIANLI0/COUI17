@@ -4,7 +4,6 @@
 package io.github.tianli0.coui17.patterns
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -146,18 +145,23 @@ fun KeyValueRow(label: String, value: String, modifier: Modifier = Modifier, car
 
 /**
  * The body under a collapsible row: it grows out of the row's bottom edge and fades in, and folds
- * back the same way (the COUI expand motion; turn the row's `ExpandArrow` with it).
+ * back the same way. COUI's expand motion (`ExpandableRecyclerConnector`): 400ms on
+ * (0.3, 0, 0.1, 1) both ways, alpha equal to the shown fraction of the height — size and fade run
+ * on the same curve, so they stay in step with the row's 400ms `ExpandArrow` turn.
  */
 @Composable
 fun ExpandBody(expanded: Boolean, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     AnimatedVisibility(
         visible = expanded,
         modifier = modifier,
-        enter = expandVertically(animationSpec = spring(dampingRatio = 0.9f, stiffness = 420f), expandFrom = Alignment.Top) +
-            fadeIn(animationSpec = tween(durationMillis = 180, delayMillis = 40)),
-        exit = shrinkVertically(animationSpec = spring(dampingRatio = 1f, stiffness = 520f), shrinkTowards = Alignment.Top) +
-            fadeOut(animationSpec = tween(durationMillis = 110)),
+        enter = expandVertically(animationSpec = tween(EXPAND_MS, easing = ExpandEasing), expandFrom = Alignment.Top) +
+            fadeIn(animationSpec = tween(EXPAND_MS, easing = ExpandEasing)),
+        exit = shrinkVertically(animationSpec = tween(EXPAND_MS, easing = ExpandEasing), shrinkTowards = Alignment.Top) +
+            fadeOut(animationSpec = tween(EXPAND_MS, easing = ExpandEasing)),
     ) {
         Column(Modifier.fillMaxWidth(), content = content)
     }
 }
+
+private const val EXPAND_MS = 400
+private val ExpandEasing = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0f, 0.1f, 1f)
