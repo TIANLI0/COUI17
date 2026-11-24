@@ -4,6 +4,19 @@
 package io.github.tianli0.coui17.patterns
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.geometry.translate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.border
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -47,58 +60,118 @@ val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
 /**
  * The surface of a control floating over scrolling content (a composer, a capsule, a floating
- * key): ColorOS 17's floating-toolbar glass.
+ * key): frosted glass, blur and tint only — no rim, inner fade or shadow (over running text they
+ * read as borders and halos).
  *
  * The tint layers are coui's `BottomFloatingToolbarDefaults` recipe, not a translucent card
  * colour: its `Luminosity` layer pulls whatever is behind to the surface's own brightness, so the
- * glass stays dark over white text in the dark theme and light over dark text in the light one (a
- * plain alpha tint lets bright content through and reads as a light-grey slab in dark mode).
- * [tint] adds a state's colour on top. The rim is ColorOS's material edge, a light line with an
- * inward fade: `TYPE_FRAMEWORK_CIRCLE_1` for a round key ([circle]), `TYPE_FRAMEWORK_CAPSULE_1`
- * for a capsule or field, as the keys and fields of a COUI floating toolbar wear them (it used to be
- * a 0.5dp solid hairline, dark on the light theme). Without runtime shaders the hairline stays.
- * Without a [LocalGlassBackdrop] it is the opaque card colour. [halo] adds the [floatingHalo] under
- * it: for the controls of a floating toolbar (its keys and its field), not for small capsules in a
- * header.
+ * glass stays dark over white text in the dark theme and light over dark text in the light one.
+ * [tint] adds a state's colour on top. Without a [LocalGlassBackdrop] it is the opaque card colour.
+ *
+ * Inside a [GlassGroup] the control does not blur by itself: it hands its outline to the group,
+ * which blurs once for all of its controls. [halo] and [circle] are kept for source compatibility.
  */
 @Composable
 fun Modifier.glassSurface(
     shape: Shape,
     tint: Color? = null,
-    halo: Boolean = false,
-    circle: Boolean = shape == CircleShape,
+    @Suppress("UNUSED_PARAMETER") halo: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") circle: Boolean = shape == CircleShape,
 ): Modifier {
     val scheme = COUITheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
     val fill = tint?.compositeOver(scheme.surfaceContainer) ?: scheme.surfaceContainer
-    val rim = if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.06f)
-    val density = LocalDensity.current
-    // A capsule here can be a field that grows lines. The inner fade is sized from the control's
-    // width and height, so on a tall field it drew a large ellipse inside it (seen on the device):
-    // capsules keep the rim line only, circles keep their fade.
-    val stroke = if (circle) {
-        MaterialStrokeParams.frameworkCircle1(dark)
-    } else {
-        MaterialStrokeParams.frameworkCapsule1(dark).copy(shadowFadeIn = 0f, shadowFadeOut = 0f)
+    val backdrop = LocalGlassBackdrop.current
+    val group = LocalGlassGroup.current
+    if (group != null && tint == null && backdrop != null && isBlurEnabled()) {
+        return this.then(group.member(shape)).clip(shape)
     }
-    val layers = remember(dark, tint) {
-        val base = if (dark) BottomFloatingToolbarDefaults.BlurColorsDark else BottomFloatingToolbarDefaults.BlurColorsLight
-        if (tint != null) base + BlendColorEntry(color = tint) else base
-    }
-    // Blur and tint only. The session page's floating controls (composer, keys, capsules, the
-    // "back to latest" pill) read as one sheet of frosted glass over the conversation: no rim line,
-    // no inner fade and no shadow, which over running text looked like borders and halos (the
-    // user's call). [halo] is kept for source compatibility and draws nothing.
+    val layers = remember(dark, tint) { glassLayers(dark, tint) }
     return this
         .couiGlassSurface(
-            backdrop = LocalGlassBackdrop.current,
+            backdrop = backdrop,
             shape = shape,
             containerColor = fill,
             fallback = Modifier.clip(shape).background(fill),
-            blurRadius = 24f,
+            blurRadius = GLASS_BLUR_RADIUS,
             blendColors = layers,
         )
         .clip(shape)
+}
+
+private const val GLASS_BLUR_RADIUS = 24f
+
+private fun glassLayers(dark: Boolean, tint: Color?): List<BlendColorEntry> {
+    val base = if (dark) BottomFloatingToolbarDefaults.BlurColorsDark else BottomFloatingToolbarDefaults.BlurColorsLight
+    return if (tint != null) base + BlendColorEntry(color = tint) else base
+}
+
+/** The outlines a [GlassGroup] blurs for its members, in the group's coordinates. */
+@Stable
+class GlassGroupState internal constructor() {
+    internal val parts = mutableStateMapOf<Any, Outline>()
+    internal var origin: LayoutCoordinates? = null
+
+    /** Registers the outline of the node it is put on; removed when the node leaves. */
+    @Composable
+    internal fun member(shape: Shape): Modifier {
+        val key = remember { Any() }
+        DisposableEffect(key) { onDispose { parts.remove(key) } }
+        val layoutDirection = LocalLayoutDirection.current
+        val density = LocalDensity.current
+        return Modifier.onGloballyPositioned { coords ->
+            val group = origin ?: return@onGloballyPositioned
+            if (!coords.isAttached || !group.isAttached) return@onGloballyPositioned
+            val offset = group.localPositionOf(coords, Offset.Zero)
+            val size = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
+            val outline = when (val o = shape.createOutline(size, layoutDirection, density)) {
+                is Outline.Rectangle -> Outline.Rectangle(o.rect.translate(offset))
+                is Outline.Rounded -> Outline.Rounded(o.roundRect.translate(offset))
+                is Outline.Generic -> Outline.Generic(Path().apply { addPath(o.path, offset) })
+            }
+            if (parts[key] != outline) parts[key] = outline
+        }
+    }
+}
+
+val LocalGlassGroup = staticCompositionLocalOf<GlassGroupState?> { null }
+
+/**
+ * Blurs once for every [glassSurface] inside it: the group samples [LocalGlassBackdrop] a single
+ * time, clipped to the union of its members' outlines, instead of each control running its own blur
+ * over the same conversation (a composer row is a field, keys and capsules — five or six blurs per
+ * frame while a session streams, which dropped frames and warmed the phone). Looks the same as
+ * separate glass. A tinted member still blurs by itself.
+ */
+@Composable
+fun GlassGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val state = remember { GlassGroupState() }
+    val dark = COUITheme.colorScheme.background.luminance() < 0.5f
+    val layers = remember(dark) { glassLayers(dark, null) }
+    val fill = COUITheme.colorScheme.surfaceContainer
+    Box(
+        modifier
+            .onGloballyPositioned { state.origin = it }
+            .couiGlassSurface(
+                backdrop = LocalGlassBackdrop.current,
+                shape = { UnionShape(state.parts.values.toList()) },
+                containerColor = fill,
+                fallback = Modifier,
+                blurRadius = GLASS_BLUR_RADIUS,
+                blendColors = layers,
+            ),
+    ) {
+        CompositionLocalProvider(LocalGlassGroup provides state) { content() }
+    }
+}
+
+/** The union of a group's member outlines (already in the group's coordinates). */
+private data class UnionShape(val outlines: List<Outline>) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val path = Path()
+        outlines.forEach { path.addOutline(it) }
+        return Outline.Generic(path)
+    }
 }
 
 /**

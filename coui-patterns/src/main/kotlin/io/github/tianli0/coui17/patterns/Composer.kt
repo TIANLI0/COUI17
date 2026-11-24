@@ -34,7 +34,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.github.suqi8.coui.kmp.basic.couiTouchMotion
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.luminance
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.RotatingProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Text
@@ -133,14 +136,22 @@ fun ComposerKey(
     enabled: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    // The same frosted glass as the field beside it: blur only, no rim, halo or press light; the
-    // press keeps COUI's touch motion (scale), so the key still answers the finger.
+    // The same frosted glass as the field beside it: blur only, no rim, halo or press light. The
+    // glass may be drawn by an enclosing GlassGroup, which does not follow a scaled key, so the press
+    // is a light dim of the disc instead of a scale.
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val dim by animateFloatAsState(if (pressed) 1f else 0f, animationSpec = spring(dampingRatio = 1f, stiffness = 1500f), label = "key-press")
+    val dark = COUITheme.colorScheme.background.luminance() < 0.5f
     Box(
         modifier
             .size(ComposerKeySize)
-            .couiTouchMotion(shape = CircleShape, enabled = enabled, lightEnabled = false)
             .glassSurface(CircleShape)
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, indication = null, interactionSource = null, onClick = onClick)
+            .drawWithContent {
+                drawContent()
+                if (dim > 0f) drawRect((if (dark) Color.White else Color.Black).copy(alpha = 0.10f * dim))
+            }
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, indication = null, interactionSource = interaction, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
         content = content,

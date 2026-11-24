@@ -144,7 +144,13 @@ fun InfoChip(
     val tint = dot?.copy(alpha = 0.16f)
     val label = if (dot != null || onClick != null) scheme.onSurface else color
     val shape = RoundedCornerShape(50)
-    val surface = if (backdrop != null) Modifier.glassSurface(shape, tint) else Modifier.clip(shape).background(tint ?: scheme.surfaceContainer)
+    // A floating chip lies on its page's header material, which already blurs what scrolls beneath:
+    // a second blur per chip only cost frames. It is a translucent card fill (plus the state tint).
+    val surface = if (backdrop != null) {
+        Modifier.clip(shape).background(scheme.surfaceContainer.copy(alpha = FLOATING_CHIP_ALPHA)).then(if (tint != null) Modifier.background(tint) else Modifier)
+    } else {
+        Modifier.clip(shape).background(tint ?: scheme.surfaceContainer)
+    }
     Row(
         modifier
             .heightIn(min = 30.dp)
@@ -257,3 +263,6 @@ fun StepButtons(
         }
     }
 }
+
+/** Opacity of a header chip over the page header material (see [InfoChip]). */
+private const val FLOATING_CHIP_ALPHA = 0.72f
