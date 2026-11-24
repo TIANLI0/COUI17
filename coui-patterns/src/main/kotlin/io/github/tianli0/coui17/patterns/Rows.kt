@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -58,10 +59,10 @@ enum class SegmentPosition { None, Single, First, Middle, Last }
 fun Modifier.segment(position: SegmentPosition, radius: Dp = 16.dp, color: Color = COUITheme.colorScheme.surfaceContainer): Modifier {
     if (position == SegmentPosition.None) return this
     val shape = when (position) {
-        SegmentPosition.Single -> RoundedCornerShape(radius)
-        SegmentPosition.First -> RoundedCornerShape(topStart = radius, topEnd = radius)
-        SegmentPosition.Last -> RoundedCornerShape(bottomStart = radius, bottomEnd = radius)
-        else -> SquircleShape(0.dp)
+        SegmentPosition.Single -> SquircleShape(radius)
+        SegmentPosition.First -> SquircleShape(topStart = radius, topEnd = radius, bottomEnd = 0.dp, bottomStart = 0.dp)
+        SegmentPosition.Last -> SquircleShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = radius, bottomStart = radius)
+        else -> RectangleShape
     }
     return this.clip(shape).background(color)
 }

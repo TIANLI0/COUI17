@@ -32,6 +32,7 @@
 ## 3. 分组里的行
 
 - 一行是 `BasicComponent` 或某个 `*Preference`。同一张卡片里的行要传 `cardListPosition = cardListPositionOf(index, count)`，这样首行和末行的按压反馈才会跟着卡片的圆角走。
+- 懒加载的长列表里，每一行是独立的列表项时用 `LazyGroupRow(position)`，看起来仍是一张卡片；自己给行加点击时先 `clip(groupRowShape(position))`。
 - 打开新页面的行用 `ArrowPreference`（带箭头）；在原地弹出菜单或执行动作的行不带箭头。
 - 行首图标用统一尺寸的彩色超椭圆底（见 gallery 的 `IconTile`），不要混用不同大小的裸图标。
 - 行里的操作用小按钮（见下），靠末端对齐。
@@ -70,6 +71,8 @@ COUI 的配色里有好几个强调色槽位：`primary`、`primaryContainer`、
 - **确认**用居中的 `ConfirmDialog`：标题、一段说明、取消 | 确认。
 - **半屏面板**用 `PanelSheet`：画在页面底色上，沿用页面的 16dp 边距，所以面板里的 `GroupCard` 和页面上一样是卡片。（默认的面板底色上，白卡片会消失。）工具栏一行：关闭胶囊、居中的标题、表单的确认胶囊。
 - 面板是在问一个决定而不是填表时，以 `SheetButtons(primary, secondary, tertiary)` 结尾：两个 44dp 胶囊并排，三个或文字过长时纵向排列。
+- **问一个值**（名称、行号、口令）用居中的 `FormDialog`：标题、内容、取消 | 确认；超过两个字段改用 `PanelSheet`。
+- **输入框要看得见。** COUI 的矩形输入框是透明底加细描边，为白色表面设计；直接放在灰色页面底色上几乎消失。`TextInput` 在页面和面板上会自动填卡片色（`LocalOnPageColor`），在卡片和对话框里保持透明。
 - 菜单用 `GlassMenu`：所有行属于同一组，行与行之间没有分隔条。
 
 ## 8. 按压反馈与动效

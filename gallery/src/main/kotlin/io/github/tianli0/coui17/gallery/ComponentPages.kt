@@ -53,7 +53,6 @@ import io.github.suqi8.coui.kmp.basic.Slider
 import io.github.suqi8.coui.kmp.basic.Stepper
 import io.github.suqi8.coui.kmp.basic.Switch
 import io.github.suqi8.coui.kmp.basic.TabRow
-import io.github.suqi8.coui.kmp.basic.TagView
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.basic.cardListPositionOf
@@ -239,6 +238,7 @@ fun ButtonsPage(onBack: () -> Unit) {
                             SmallButton(tr("主要", "Primary"), { count++ }, tone = ActionTone.Primary)
                             SmallButton(tr("危险", "Danger"), { count++ }, tone = ActionTone.Danger)
                             SmallButton(tr("不可用", "Disabled"), {}, enabled = false)
+                            SmallButton(tr("主要", "Primary"), {}, tone = ActionTone.Primary, loading = true)
                         }
                     }
                     BasicComponent(
@@ -393,8 +393,8 @@ fun InputPage(onBack: () -> Unit) {
             item { Spacer(Modifier.height(16.dp)) }
             item {
                 GroupCard {
-                    KeyValueRow(tr("名称", "Name"), name.ifEmpty { "—" })
-                    KeyValueRow(tr("备注字数", "Note length"), note.length.toString())
+                    KeyValueRow(tr("名称", "Name"), name.ifEmpty { "—" }, cardListPosition = cardListPositionOf(0, 2))
+                    KeyValueRow(tr("备注字数", "Note length"), note.length.toString(), cardListPosition = cardListPositionOf(1, 2))
                 }
             }
             item {
@@ -423,7 +423,7 @@ fun TagsPage(onBack: () -> Unit) {
                     tabs = listOf(tr("进行中", "Live"), tr("历史", "History"), tr("全部", "All")),
                     selectedTabIndex = tab,
                     onTabSelected = { tab = it },
-                    modifier = Modifier.padding(horizontal = PageDefaults.CardGutter),
+                    modifier = Modifier.padding(horizontal = PageDefaults.CardGutter).padding(bottom = 12.dp),
                 )
             }
             item { SectionHeader(tr("胶囊标签页", "Chip tabs")) }
@@ -439,6 +439,7 @@ fun TagsPage(onBack: () -> Unit) {
                     selectedIndex = chipTab,
                     onSelectedChange = { chipTab = it },
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = PageDefaults.CardGutter),
+                    modifier = Modifier.padding(bottom = 12.dp),
                 )
             }
             item { SectionHeader(tr("筛选胶囊", "Filter chips")) }
@@ -468,7 +469,6 @@ fun TagsPage(onBack: () -> Unit) {
                             StatusPill(tr("等待确认", "Waiting"), TileOrange)
                             StatusPill(tr("出错", "Failed"), COUITheme.colorScheme.error)
                             StatusPill(tr("已结束", "Ended"), TileGrey)
-                            TagView(text = tr("默认标签", "Default tag"))
                         }
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -613,17 +613,17 @@ fun ListsPage(onBack: () -> Unit) {
                         onClick = { expanded = !expanded },
                     )
                     ExpandBody(expanded) {
-                        KeyValueRow(tr("协议", "Protocol"), "TLS 1.3")
-                        KeyValueRow(tr("端口", "Port"), "47700")
+                        KeyValueRow(tr("协议", "Protocol"), "TLS 1.3", cardListPosition = cardListPositionOf(1, 3))
+                        KeyValueRow(tr("端口", "Port"), "47700", cardListPosition = cardListPositionOf(2, 3))
                     }
                 }
             }
             item { SectionHeader(tr("键值", "Key / value")) }
             item {
                 GroupCard {
-                    KeyValueRow(tr("型号", "Model"), "PKX110")
-                    KeyValueRow(tr("系统版本", "System"), "ColorOS 17")
-                    KeyValueRow(tr("存储", "Storage"), "186 GB / 512 GB")
+                    KeyValueRow(tr("型号", "Model"), "PKX110", cardListPosition = cardListPositionOf(0, 3))
+                    KeyValueRow(tr("系统版本", "System"), "ColorOS 17", cardListPosition = cardListPositionOf(1, 3))
+                    KeyValueRow(tr("存储", "Storage"), "186 GB / 512 GB", cardListPosition = cardListPositionOf(2, 3))
                 }
             }
             item { Note(tr("一个分组就是一张圆角卡片，距屏幕边缘 16dp；说明文字缩进 32dp，与行标题对齐。", "A group is one rounded card, 16dp from the screen edge; loose text sits at 32dp, in line with the row titles.")) }

@@ -4,6 +4,7 @@
 package io.github.tianli0.coui17.patterns
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -24,6 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -36,6 +40,7 @@ import io.github.suqi8.coui.kmp.basic.BindScrollToTop
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CardDefaults
+import io.github.suqi8.coui.kmp.basic.CardListPosition
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Scaffold
@@ -49,6 +54,7 @@ import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
+import io.github.suqi8.coui.kmp.squircle.SquircleShape
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.suqi8.coui.kmp.utils.overScrollVertical
 import io.github.suqi8.coui.kmp.utils.scrollEndHaptic
@@ -225,6 +231,7 @@ fun Page(
         CompositionLocalProvider(
             LocalPageScrollBehavior provides behavior,
             LocalPageTopInset provides if (immersive) top else 0.dp,
+            LocalOnPageColor provides true,
         ) {
             Box(Modifier.fillMaxSize()) {
                 Column(
@@ -276,6 +283,45 @@ fun GroupCard(modifier: Modifier = Modifier, bottom: Dp = PageDefaults.GroupSpac
         cornerRadius = CardDefaults.GroupCornerRadius,
         weight = CardDefaults.GroupWeight,
         modifier = modifier.fillMaxWidth().padding(horizontal = PageDefaults.CardGutter).padding(bottom = bottom),
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalOnPageColor provides false) { content() }
+    }
+}
+
+/**
+ * The outline of one row of a group card: the card squircle corners on the outer edges of the
+ * group only. Clip a row with it before `clickable` / `combinedClickable`
+ * (`Modifier.clip(groupRowShape(position))`), so the press feedback of the first and last rows
+ * follows the corners of the card.
+ */
+fun groupRowShape(position: CardListPosition, radius: Dp = CardDefaults.GroupCornerRadius): Shape = when (position) {
+    CardListPosition.Full -> SquircleShape(radius, weight = CardDefaults.GroupWeight)
+    CardListPosition.Head -> SquircleShape(topStart = radius, topEnd = radius, bottomEnd = 0.dp, bottomStart = 0.dp, weight = CardDefaults.GroupWeight)
+    CardListPosition.Tail -> SquircleShape(topStart = 0.dp, topEnd = 0.dp, bottomEnd = radius, bottomStart = radius, weight = CardDefaults.GroupWeight)
+    else -> RectangleShape
+}
+
+/**
+ * One row of a group card laid out as its own lazy-list item: the rows of a long list (a folder
+ * with thousands of entries) read as one [GroupCard] without composing them all at once. Pass the
+ * same [position] to the row inside (`cardListPosition`); the last row adds the gap under the group.
+ */
+@Composable
+fun LazyGroupRow(
+    position: CardListPosition,
+    modifier: Modifier = Modifier,
+    bottom: Dp = PageDefaults.GroupSpacing,
+    content: @Composable () -> Unit,
+) {
+    val last = position == CardListPosition.Tail || position == CardListPosition.Full
+    Box(
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = PageDefaults.CardGutter)
+            .padding(bottom = if (last) bottom else 0.dp)
+            .clip(groupRowShape(position))
+            .background(CardDefaults.defaultColors().color),
+    ) {
+        CompositionLocalProvider(LocalOnPageColor provides false) { content() }
+    }
 }

@@ -16,7 +16,9 @@ First release as a standalone repository.
   `NoticeBanner`, `StatusPill`), `ExpandBody` and `TextInput`; the composer (`InputPill`,
   `ComposerKey`, `RoundIconButton`); dense rows and capsules (`CollapsibleRow`, `InfoChip`,
   `StatFigure`, `StatusDot`, `Modifier.segment`); cards (`ChatBubble`, `AttentionCard`,
-  `TimelineCard`) and `StepButtons`.
+  `TimelineCard`), `StepButtons`, `FormDialog`, `groupRowShape` / `LazyGroupRow`, a loading
+  state for `SmallButton`, and `LocalOnPageColor` (a `TextInput` fills itself with the card colour
+  when it sits directly on the page colour).
 - A gallery application.
 - Maven publications `io.github.tianli0.coui17:<module>` (local repository).
 - CI, and a daily workflow that follows upstream and merges it when it is safe to.

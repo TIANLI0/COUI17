@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.BasicComponent
+import io.github.suqi8.coui.kmp.basic.CardListPosition
 import io.github.suqi8.coui.kmp.basic.EmptyState
 import io.github.suqi8.coui.kmp.basic.InfiniteProgressIndicator
 import io.github.suqi8.coui.kmp.basic.SmallTitle
@@ -134,10 +135,13 @@ fun NoticeBanner(text: String, color: Color, modifier: Modifier = Modifier, acti
     )
 }
 
-/** A label / value row of a detail group: a COUI17 list row (title = label, summary = value). */
+/**
+ * A label / value row of a detail group: a COUI17 list row (title = label, summary = value). Pass
+ * its [cardListPosition] like any other row of a group, so it gets the divider between rows.
+ */
 @Composable
-fun KeyValueRow(label: String, value: String, modifier: Modifier = Modifier) {
-    BasicComponent(title = label, summary = value, modifier = modifier)
+fun KeyValueRow(label: String, value: String, modifier: Modifier = Modifier, cardListPosition: CardListPosition = CardListPosition.None) {
+    BasicComponent(title = label, summary = value, modifier = modifier, cardListPosition = cardListPosition)
 }
 
 /**

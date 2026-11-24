@@ -29,6 +29,7 @@ import io.github.suqi8.coui.kmp.preference.RadioButtonPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.tianli0.coui17.patterns.ActionTone
 import io.github.tianli0.coui17.patterns.ConfirmDialog
+import io.github.tianli0.coui17.patterns.FormDialog
 import io.github.tianli0.coui17.patterns.FullScreenDialog
 import io.github.tianli0.coui17.patterns.GlassMenu
 import io.github.tianli0.coui17.patterns.GroupCard
@@ -51,6 +52,9 @@ fun OverlaysPage() {
     var decision by rememberSaveable { mutableStateOf(false) }
     var fullScreen by rememberSaveable { mutableStateOf(false) }
     var menu by rememberSaveable { mutableStateOf(false) }
+    var rename by rememberSaveable { mutableStateOf(false) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    val renamed = tr("已重命名", "Renamed")
     var rowMenu by rememberSaveable { mutableStateOf(false) }
     var sort by rememberSaveable { mutableIntStateOf(0) }
     var last by rememberSaveable { mutableStateOf("") }
@@ -87,7 +91,14 @@ fun OverlaysPage() {
                     ArrowPreference(
                         title = tr("确认对话框", "Confirmation"),
                         summary = tr("居中的标题、一段说明、取消 | 确认", "Centred title, one message, cancel | confirm"),
+                        cardListPosition = cardListPositionOf(0, 2),
                         onClick = { confirm = true },
+                    )
+                    ArrowPreference(
+                        title = tr("输入对话框", "Form dialog"),
+                        summary = tr("问一个值：名称、行号、口令", "Asks for one value: a name, a line number"),
+                        cardListPosition = cardListPositionOf(1, 2),
+                        onClick = { rename = true },
                     )
                 }
             }
@@ -152,6 +163,20 @@ fun OverlaysPage() {
         },
         onDismiss = { confirm = false },
     )
+
+    FormDialog(
+        show = rename,
+        title = tr("重命名", "Rename"),
+        confirmText = tr("确定", "OK"),
+        confirmEnabled = newName.isNotBlank(),
+        onConfirm = {
+            rename = false
+            last = renamed
+        },
+        onDismiss = { rename = false },
+    ) {
+        TextInput(value = newName, onValueChange = { newName = it }, label = tr("名称", "Name"), showClearButton = true)
+    }
 
     var name by rememberSaveable { mutableStateOf("") }
     var kind by rememberSaveable { mutableIntStateOf(0) }

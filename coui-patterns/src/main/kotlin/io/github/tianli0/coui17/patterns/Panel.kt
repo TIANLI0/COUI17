@@ -4,7 +4,9 @@
 package io.github.tianli0.coui17.patterns
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -35,6 +38,7 @@ import io.github.suqi8.coui.kmp.theme.LocalDismissState
 import io.github.suqi8.coui.kmp.utils.RemovePlatformDialogDefaultEffects
 import io.github.suqi8.coui.kmp.window.WindowAlertDialog
 import io.github.suqi8.coui.kmp.window.WindowBottomSheet
+import io.github.suqi8.coui.kmp.window.WindowDialog
 
 /** The confirming action of a form panel ("create", "save"): the accent capsule at the end of its toolbar. */
 data class SheetConfirm(val text: String, val enabled: Boolean = true, val testTag: String? = null, val onClick: () -> Unit)
@@ -101,7 +105,7 @@ fun PanelSheet(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            content()
+            CompositionLocalProvider(LocalOnPageColor provides true) { content() }
         }
     }
 }
@@ -167,7 +171,10 @@ fun FullScreenDialog(onDismissRequest: () -> Unit, content: @Composable () -> Un
     }
 }
 
-/** The centred COUI17 confirmation for a write: title, one message, cancel | confirm. */
+/**
+ * The centred COUI17 confirmation for a write: title, one message, cancel | confirm. [content] adds
+ * detail under the message (what exactly will change).
+ */
 @Composable
 fun ConfirmDialog(
     show: Boolean,
@@ -177,6 +184,7 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     cancelText: String = stringResource(R.string.coui17_action_cancel),
+    content: (@Composable () -> Unit)? = null,
 ) {
     WindowAlertDialog(
         show = show,
@@ -186,5 +194,43 @@ fun ConfirmDialog(
         summary = message,
         confirmText = confirmText,
         cancelText = cancelText,
+        content = content,
     )
+}
+
+/** Side gutter of fields and text inside a centred dialog. */
+val DialogContentGutter = 24.dp
+
+/**
+ * A centred dialog that asks for a value (a name, a line number, a credential): the title,
+ * [content] at the dialog gutter, then the COUI17 button bar with cancel | [confirmText]. The
+ * confirm capsule is disabled while [confirmEnabled] is false. Put a [TextInput] and, if needed, a
+ * line of help or error text in [content]; for more than two fields use a [PanelSheet].
+ */
+@Composable
+fun FormDialog(
+    show: Boolean,
+    title: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    confirmEnabled: Boolean = true,
+    cancelText: String = stringResource(R.string.coui17_action_cancel),
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    WindowDialog(show = show, modifier = modifier, title = title, onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = DialogContentGutter, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                CompositionLocalProvider(LocalOnPageColor provides false) { content() }
+            }
+            DialogButtonBar(
+                negative = DialogButtonBarAction(text = cancelText, onClick = onDismiss),
+                positive = DialogButtonBarAction(text = confirmText, enabled = confirmEnabled, onClick = onConfirm),
+            )
+        }
+    }
 }
