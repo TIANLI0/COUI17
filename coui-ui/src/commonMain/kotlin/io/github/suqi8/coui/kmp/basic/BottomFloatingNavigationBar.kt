@@ -473,6 +473,16 @@ private fun BottomFloatingNavigationBarCapsule(
                             // params; keep the Compose rim there.
                             surface = if (platform != null && !platform.drawsOwnStroke) {
                                 Modifier.glassRim(shape, isDark)
+                            } else if (platform == null && backdrop != null && isBlurEnabled()) {
+                                // The Compose glass paints the rim line; the material's second half,
+                                // the fade inward from the rim, is this layer (see InnerGlowFade).
+                                Modifier.materialInnerGlow(
+                                    cornerRadius = barHeight / 2,
+                                    cornerWeight = MaterialShadowEdgeDefaults.CornerWeight,
+                                    fade = BottomFloatingNavigationBarDefaults.innerGlowFade(isDark),
+                                    shadowStyle = InnerShadowStyle.SHADOW_STYLE_0,
+                                    behindContent = true,
+                                )
                             } else {
                                 Modifier
                             },
@@ -527,6 +537,14 @@ private fun BottomFloatingNavigationBarMeltBall(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = spring(dampingRatio = 0.65f, stiffness = 130f),
         label = "meltBallExpansion",
+    )
+
+    // `initExpansionViewAlphaAnim`: the expansion view fades on its own spring (response 0.35,
+    // bounce 0), not on the bouncing geometry spring, so it is fully in before the blob settles.
+    val expansionAlpha by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = spring(dampingRatio = 1f, stiffness = 322f),
+        label = "expansion-alpha",
     )
 
     var capsuleWidthPx by remember { mutableIntStateOf(0) }
@@ -707,6 +725,17 @@ private fun BottomFloatingNavigationBarMeltBall(
                                 shape = shape,
                                 lightParams = SpotLightDefaults.opaqueMedium2(isDark),
                                 motionState = menuTouchState,
+                                surface = if (platform == null && backdrop != null && isBlurEnabled()) {
+                                    Modifier.materialInnerGlow(
+                                        cornerRadius = barHeight / 2,
+                                        cornerWeight = MaterialShadowEdgeDefaults.CornerWeight,
+                                        fade = BottomFloatingNavigationBarDefaults.innerGlowFade(isDark),
+                                        shadowStyle = InnerShadowStyle.SHADOW_STYLE_0,
+                                        behindContent = true,
+                                    )
+                                } else {
+                                    Modifier
+                                },
                             ),
                         // COUI narrows the menu view by exactly the expansion view's footprint plus the
                         // side spacing while the expansion view is active, and hands it the full width
@@ -734,7 +763,7 @@ private fun BottomFloatingNavigationBarMeltBall(
                                     extraTransform = {
                                         scaleX *= progress
                                         scaleY *= progress
-                                        alpha = progress
+                                        alpha = expansionAlpha
                                     },
                                 ),
                         ) {
@@ -1094,6 +1123,20 @@ object BottomFloatingNavigationBarDefaults {
      * only reads as light on a dark page.
      */
     val CausticColor = Color(0x42FFFFFF)
+
+    /**
+     * The inward fade of `TYPE_FRAMEWORK_CAPSULE_3` (`FRAMEWORK_CAPSULE_PARAMS_3_LIGHT` / `_DARK`:
+     * shadowFadeIn 0.1 / 0.03, shadowFadeOut 1, shadowFadeScale 1). The system material lays it inside
+     * the rim line; the Compose glass drew the line only, so its rim read as a hard white edge.
+     */
+    fun innerGlowFade(isDark: Boolean): MaterialStrokeParams = MaterialStrokeParams(
+        edgeAlpha = 0f,
+        edgeWidth = 2.5.dp,
+        edgeAngle = 0f,
+        shadowFadeIn = if (isDark) 0.03f else 0.1f,
+        shadowFadeOut = 1f,
+        shadowFadeScale = 1f,
+    )
 
     /** The tint layers of the bar's material for the current theme. */
     fun blurColors(isDark: Boolean): List<BlendColorEntry> = if (isDark) BlurColorsDark else BlurColorsLight

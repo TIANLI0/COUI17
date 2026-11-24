@@ -756,6 +756,8 @@ private fun Modifier.drawMaterialShadowEdge(
  * @param cornerWeight The `u_commonArray[10]` corner weight.
  * @param fade The inner-shadow reach; only its shadow fields are read.
  * @param shadowStyle The inner-shadow style, one of the [InnerShadowStyle] presets.
+ * @param behindContent Paint the glow behind this node's content instead of in front of it: the
+ *   material's own shadow layer (`OplusMaterialShadowParams`) lies under a bar's icons and labels.
  */
 @Composable
 fun Modifier.materialInnerGlow(
@@ -763,6 +765,7 @@ fun Modifier.materialInnerGlow(
     cornerWeight: Float = MaterialShadowEdgeDefaults.InnerGlowCornerWeight,
     fade: MaterialStrokeParams = MaterialShadowEdgeDefaults.InnerGlowFade,
     shadowStyle: InnerShadowStyle = InnerShadowStyle.SHADOW_STYLE_2,
+    behindContent: Boolean = false,
 ): Modifier {
     val density = LocalDensity.current.density
     val shader = rememberMaterialShadowEdgeShader(isRuntimeShaderSupported()) ?: return this
@@ -785,8 +788,13 @@ fun Modifier.materialInnerGlow(
             edgeEnabled = false,
         )
         onDrawWithContent {
-            drawContent()
-            drawRect(brush = shader.asBrush(), size = size)
+            if (behindContent) {
+                drawRect(brush = shader.asBrush(), size = size)
+                drawContent()
+            } else {
+                drawContent()
+                drawRect(brush = shader.asBrush(), size = size)
+            }
         }
     }
 }
