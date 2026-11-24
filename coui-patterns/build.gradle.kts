@@ -44,11 +44,15 @@ dependencies {
     testImplementation(libs.junit4)
 }
 
-afterEvaluate {
-    extensions.configure<PublishingExtension> {
-        publications {
-            create<MavenPublication>("release") {
-                from(components["release"])
+// Only when the including build publishes (this repository's root build applies maven-publish);
+// a build that includes the module as source needs no publication.
+plugins.withId("maven-publish") {
+    afterEvaluate {
+        extensions.configure<PublishingExtension> {
+            publications {
+                create<MavenPublication>("release") {
+                    from(components["release"])
+                }
             }
         }
     }
