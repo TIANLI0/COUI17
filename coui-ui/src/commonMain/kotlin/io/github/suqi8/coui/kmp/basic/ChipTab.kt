@@ -1096,10 +1096,10 @@ private suspend fun ScrollState.scrollTabIntoView(bounds: Rect, fadeWidthPx: Flo
 private val ChipTabContainer4Light = Color(0x0A000000)
 
 /**
- * The unchecked pill in dark themes at the alpha the notes app actually lands on: 8.2% white over
- * the `#303030` page is `#414141`, the measured value.
+ * couiColorContainer4 in dark themes (coui_color_container4, night: #1AFFFFFF): the unchecked pill
+ * over the black card page. (It was 0x15FFFFFF, fitted to land on #414141 over the old #303030 page.)
  */
-private val ChipTabContainer4Dark = Color(0x15FFFFFF)
+private val ChipTabContainer4Dark = Color(0x1AFFFFFF)
 
 /** The checked pill in light themes: `#F5F6F7`, the measured body of the notes app's checked chip. */
 private val ChipTabCheckedSurfaceLight = Color(0xFFF5F6F7)

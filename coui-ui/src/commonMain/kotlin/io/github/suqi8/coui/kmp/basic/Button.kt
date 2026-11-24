@@ -105,7 +105,7 @@ fun Button(
     interactionSource: MutableInteractionSource? = null,
     indication: Indication? = null,
     size: ButtonSize = ButtonSize.Regular,
-    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors),
+    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors, enabled),
     spotLight: SpotLightParams? = ButtonDefaults.defaultSpotLight(colors),
     backdrop: Backdrop? = null,
     touchMotionEnabled: Boolean = true,
@@ -234,7 +234,7 @@ fun Button(
     }
     // When touchMotionEnabled is active, couiTouchMotion drives both the rubber-band deformation and
     // the clipped spotlight; when disabled, fall back to pressSpotLight so explicit spotLight still works.
-    val standaloneLightModifier = if (!touchMotionEnabled && spotLight != null && fillColor.alpha > 0f) {
+    val standaloneLightModifier = if (!touchMotionEnabled && spotLight != null) {
         Modifier.pressSpotLight(
             params = spotLight,
             shape = buttonShape,
@@ -257,7 +257,7 @@ fun Button(
                 motionState = touchMotionState,
                 pressScaleEnabled = pressScaleEnabled,
                 consumeDrag = false,
-                lightEnabled = spotLight != null && fillColor.alpha > 0f,
+                lightEnabled = spotLight != null,
             )
         } else {
             Modifier
@@ -468,7 +468,7 @@ fun TextButton(
     interactionSource: MutableInteractionSource? = null,
     indication: Indication? = null,
     size: ButtonSize = ButtonSize.Regular,
-    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors),
+    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors, enabled),
     spotLight: SpotLightParams? = ButtonDefaults.defaultSpotLight(colors),
     backdrop: Backdrop? = null,
     touchMotionEnabled: Boolean = true,
@@ -850,20 +850,23 @@ object ButtonDefaults {
     }
 
     /**
-     * The rim `COUIButton` draws for [colors]: `TYPE_CONTENT_CAPSULE_4` for a filled accent
-     * (`ButtonType.PRIMARY`) button, `TYPE_CONTENT_CAPSULE_5` for a secondary one, and none for a
-     * borderless button whose fill is transparent.
+     * The rim `COUIButton` asks the system material for: `TYPE_CONTENT_CAPSULE_1` for a filled accent
+     * (`ButtonType.PRIMARY`) button, `TYPE_CONTENT_CAPSULE_2` for a secondary one, their `DISABLED`
+     * variants while [enabled] is false, and none for a borderless button whose fill is transparent.
+     * (`TYPE_CONTENT_CAPSULE_4` / `_5` are only the drawable-material fallback of a style that sets
+     * `drawableMaterialEffect`; they stay available as [MaterialStrokeParams.contentCapsule4] / `5`.)
      */
     @Composable
-    fun defaultEdgeStroke(colors: ButtonColors): MaterialStrokeParams? = edgeStrokeFor(colors.color)
+    fun defaultEdgeStroke(colors: ButtonColors, enabled: Boolean = true): MaterialStrokeParams? = edgeStrokeFor(colors.color, enabled)
 
     /** [defaultEdgeStroke] for [TextButtonColors]. */
     @Composable
-    fun defaultEdgeStroke(colors: TextButtonColors): MaterialStrokeParams? = edgeStrokeFor(colors.color)
+    fun defaultEdgeStroke(colors: TextButtonColors, enabled: Boolean = true): MaterialStrokeParams? = edgeStrokeFor(colors.color, enabled)
 
     /**
-     * The press spotlight `COUIButton` turns on for [colors]: [SpotLightDefaults.capsuleParams1] for
-     * the recommend button (`ButtonType.PRIMARY`), `null` for every other type.
+     * The press spotlight `COUIButton` turns on for [colors]: `TYPE_OPAQUE_MEDIUM_1` for the recommend
+     * button (`ButtonType.PRIMARY`), `TYPE_OPAQUE_MEDIUM_2` for a filled secondary one and
+     * `TYPE_TRANSPARENT_MEDIUM_1` for a borderless one.
      */
     @Composable
     fun defaultSpotLight(colors: ButtonColors): SpotLightParams? = spotLightFor(colors.color)
@@ -873,23 +876,24 @@ object ButtonDefaults {
     fun defaultSpotLight(colors: TextButtonColors): SpotLightParams? = spotLightFor(colors.color)
 
     @Composable
-    private fun edgeStrokeFor(fill: Color): MaterialStrokeParams? {
+    private fun edgeStrokeFor(fill: Color, enabled: Boolean): MaterialStrokeParams? {
         if (fill.alpha == 0f) return null
         val scheme = COUITheme.colorScheme
         val isDark = scheme.background.luminance() < 0.5f
         return when {
-            isAccentFill(fill, scheme.containerTheme) -> MaterialStrokeParams.contentCapsule4(isDark)
-            else -> MaterialStrokeParams.contentCapsule5(isDark)
+            isAccentFill(fill, scheme.containerTheme) -> MaterialStrokeParams.contentCapsule1(isDark, enabled)
+            else -> MaterialStrokeParams.contentCapsule2(isDark, enabled)
         }
     }
 
     @Composable
-    private fun spotLightFor(fill: Color): SpotLightParams? {
+    private fun spotLightFor(fill: Color): SpotLightParams {
         val scheme = COUITheme.colorScheme
-        return if (fill.alpha > 0f && isAccentFill(fill, scheme.containerTheme)) {
-            SpotLightDefaults.capsuleParams1(scheme.background.luminance() < 0.5f)
-        } else {
-            null
+        val isDark = scheme.background.luminance() < 0.5f
+        return when {
+            fill.alpha == 0f -> SpotLightDefaults.transparentMedium1(isDark)
+            isAccentFill(fill, scheme.containerTheme) -> SpotLightDefaults.opaqueMedium1(isDark)
+            else -> SpotLightDefaults.opaqueMedium2(isDark)
         }
     }
 

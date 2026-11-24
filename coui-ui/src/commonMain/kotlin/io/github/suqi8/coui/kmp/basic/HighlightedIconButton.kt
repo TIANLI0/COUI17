@@ -56,7 +56,7 @@ import io.github.suqi8.coui.kmp.theme.LocalContentColor
  * ColorOS gives the toolbar's back key and overflow key the same effect: a true 40dp circle — not a
  * squircle — carrying a radial fill that is darker in the middle and brighter at the rim, an
  * angle-distributed material perimeter highlight, and a theme-dependent halo outside the edge. While
- * pressed the whole control springs to [HighlightedIconButtonDefaults.PressedScale], the rim and the
+ * pressed the whole control scales on the shared touch-motion press springs, the rim and the
  * halo disappear and the fill and icon brighten; both themes behave identically.
  *
  * The rim uses the framework's material-luminance blend with TYPE_FRAMEWORK_CIRCLE_1 and
@@ -114,7 +114,6 @@ fun HighlightedIconButton(
     val isDark = scheme.background.luminance() < 0.5f
     val density = LocalDensity.current
     val blurScale = rememberToolbarAttenuatedBlurScale()
-    val scale = 1f - (1f - HighlightedIconButtonDefaults.PressedScale) * pressProgress
     val contentColor = lerp(
         scheme.onBackground,
         Color.White,
@@ -166,17 +165,15 @@ fun HighlightedIconButton(
                 .couiTouchMotion(
                     enabled = enabled,
                     motionState = touchMotion,
-                    pressScaleEnabled = false,
+                    // `ToolbarMaterialEffectDelegate` runs the key on the standard COUIViewTouchAnimator
+                    // (deformation, rubber band, press scale on the shared PressParams springs).
+                    pressScaleEnabled = true,
                     // The light belongs to the disc; a plain circle clip on the pressed box would
                     // light a pill around it.
                     shape = lightShape,
-                    lightParams = SpotLightDefaults.circleParams1(isDark),
+                    // TYPE_OPAQUE_SMALL_2, the toolbar key's press light.
+                    lightParams = SpotLightDefaults.opaqueSmall2(isDark),
                     lightEnabled = spotLightEnabled,
-                    extraTransform = {
-                        // Press shrink and native drag deformation belong to one visual layer.
-                        scaleX += scale - 1f
-                        scaleY += scale - 1f
-                    },
                 )
                 .then(clickableModifier),
             contentAlignment = Alignment.Center,
@@ -185,7 +182,10 @@ fun HighlightedIconButton(
                 modifier = Modifier.size(size),
                 contentAlignment = Alignment.Center,
             ) {
-                if (isDark) {
+                // `ToolbarMaterialEffectDelegate` casts `coui_caustic_color_1` under the key in both
+                // themes (#33FFFFFF dark, #2EFFFFFF light) beside the level-6 shadow; the light
+                // theme's drop halo below stands in for that shadow.
+                run {
                     MaterialCausticShadow(
                         particles = listOf(
                             CausticShadowParticle(
@@ -193,9 +193,9 @@ fun HighlightedIconButton(
                                 CausticShadowProfile.Toolbar,
                             ),
                         ),
-                        color = HighlightedIconButtonDefaults.DarkHaloColor.copy(
-                            alpha = HighlightedIconButtonDefaults.DarkHaloColor.alpha * (1f - pressProgress).coerceIn(0f, 1f),
-                        ),
+                        color = HighlightedIconButtonDefaults.causticColor(isDark).let { c ->
+                            c.copy(alpha = c.alpha * (1f - pressProgress).coerceIn(0f, 1f))
+                        },
                         modifier = Modifier.matchParentSize(),
                     )
                 }
@@ -238,7 +238,15 @@ fun HighlightedIconButton(
                                 center = center,
                             )
                             drawContent()
-                        },
+                        }
+                        // TYPE_FRAMEWORK_CIRCLE_1's second half: the fade inward from the rim
+                        // (fadeIn 0.15 light / 0.1 dark, fadeOut 1), over the fill, under the icon.
+                        .materialInnerGlow(
+                            cornerRadius = size / 2,
+                            cornerWeight = MaterialShadowEdgeDefaults.CapsuleCornerWeight,
+                            fade = MaterialStrokeParams.frameworkCircle1(isDark).copy(edgeAlpha = 0f),
+                            shadowStyle = InnerShadowStyle.SHADOW_STYLE_0,
+                        ),
                 )
                 // Keep the icon out of the material RGB effect.
                 Box(modifier = Modifier.matchParentSize(), contentAlignment = Alignment.Center, content = content)
@@ -427,6 +435,12 @@ object HighlightedIconButtonDefaults {
 
     /** ToolbarMaterialEffectDelegate uses coui_caustic_color_1: 0x33ffffff at night. */
     val DarkHaloColor = Color.White.copy(alpha = 51f / 255f)
+
+    /** `coui_caustic_color_1` in the light theme, #2EFFFFFF. */
+    val LightCausticColor = Color.White.copy(alpha = 46f / 255f)
+
+    /** The caustic light cast under the key: [DarkHaloColor] dark, [LightCausticColor] light. */
+    fun causticColor(isDark: Boolean): Color = if (isDark) DarkHaloColor else LightCausticColor
 
     /** Native level-2 bottom layout offset; the SDF fades before reaching the draw rectangle. */
     val DarkHaloExtent = 4.899994.dp

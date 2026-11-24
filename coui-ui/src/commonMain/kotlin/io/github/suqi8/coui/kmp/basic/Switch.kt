@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
@@ -106,6 +107,7 @@ fun Switch(
     val isHovered by interactionSource.collectIsHoveredAsState()
 
     val couiHaptic = rememberCouiHaptic()
+    val clickSound = io.github.suqi8.coui.kmp.utils.rememberCouiClickSound()
 
     val squircleEnabled = isSquircleEnabled()
     val capsuleShape = remember(squircleEnabled) {
@@ -143,15 +145,16 @@ fun Switch(
         animationSpec = tween(durationMillis = 450, easing = couiToggleEasing),
     )
 
-    // COUI press/hover feedback: translucent overlay over the bar color (coui_color_press / coui_color_hover).
-    // COUISwitch.configStateEffectAnimator drives both with spring(response 0.3, bounce 0).
-    val overlayTone = COUITheme.colorScheme.onSurface
+    // COUI press/hover feedback: translucent overlay over the bar color (coui_color_press / coui_color_hover:
+    // #1F000000 / #14000000 light, #33FFFFFF / #26FFFFFF dark). COUISwitch.configStateEffectAnimator
+    // drives both with spring(response 0.3, bounce 0).
+    val overlayDark = COUITheme.colorScheme.background.luminance() < 0.5f
     val overlaySpring = remember { folmeSpring<Color>(damping = 1f, response = 0.3f) }
     val pressOverlayState = animateColorAsState(
         when {
             !enabled -> Color.Transparent
-            isPressed -> overlayTone.copy(alpha = 0.12f)
-            isHovered -> overlayTone.copy(alpha = 0.078f)
+            isPressed -> if (overlayDark) Color(0x33FFFFFF) else Color(0x1F000000)
+            isHovered -> if (overlayDark) Color(0x26FFFFFF) else Color(0x14000000)
             else -> Color.Transparent
         },
         animationSpec = overlaySpring,
@@ -180,6 +183,7 @@ fun Switch(
     }
 
     val currentCouiHaptic by rememberUpdatedState(couiHaptic)
+    val currentClickSound by rememberUpdatedState(clickSound)
     // Loading switches cannot be toggled (COUISwitch loading style swallows touch).
     val interactive = enabled && !isLoading
     val hasCallback = onCheckedChange != null
@@ -187,6 +191,9 @@ fun Switch(
         { value ->
             currentOnCheckedChange?.invoke(value)
             currentCouiHaptic(CouiHapticEffect.Switch)
+            // COUISwitch plays coui_switch_sound_on/off when touch sounds are on; the system click
+            // stands in for those (the platform skips it when the setting is off).
+            currentClickSound()
         }
     }
     val currentChecked by rememberUpdatedState(checked)

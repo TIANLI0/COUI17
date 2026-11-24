@@ -152,7 +152,7 @@ object PinnedTopAppBarDefaults {
  *   navigation bars on the horizontal sides, the way [TopAppBar] does. The status-bar inset is
  *   always applied.
  * @param containerColor The base colour of the material. Defaults to
- *   [AppBarBlurOverlayDefaults.containerColor] (the dark page background, `#303030`, measured on
+ *   [AppBarBlurOverlayDefaults.containerColor] (the dark page background, `#000000` (`coui_color_background_with_card`); formerly `#303030`, measured on
  *   Gallery, in the dark theme).
  * @param titleColor The title colour.
  * @param titleStyle The title text style, [PinnedTopAppBarDefaults.titleStyle] by default.

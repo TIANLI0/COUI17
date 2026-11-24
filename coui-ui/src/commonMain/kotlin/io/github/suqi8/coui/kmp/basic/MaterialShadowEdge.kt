@@ -431,7 +431,7 @@ data class MaterialStrokeParams(
             edgeAlpha = 0.3f,
             edgeWidth = 2.5.dp,
             edgeAngle = 0f,
-            shadowFadeIn = 0.1f,
+            shadowFadeIn = 0.04f,
             shadowFadeOut = 0f,
             shadowFadeScale = 1f,
         )
@@ -441,13 +441,33 @@ data class MaterialStrokeParams(
             edgeAlpha = 0.25f,
             edgeWidth = 2.5.dp,
             edgeAngle = 0f,
-            shadowFadeIn = 0.1f,
+            shadowFadeIn = 0.06f,
             shadowFadeOut = 0f,
             shadowFadeScale = 1f,
         )
 
         /** Resolves `TYPE_CONTENT_CAPSULE_4` by night mode, as `getStrokeParamsByType` does. */
         fun contentCapsule4(isDark: Boolean): MaterialStrokeParams = if (isDark) ContentCapsule4Dark else ContentCapsule4
+
+        /**
+         * `TYPE_CONTENT_CAPSULE_1` — the rim `COUIButton` asks the system material for on a filled
+         * accent (`ButtonType.PRIMARY`) button. Unlike [ContentCapsule4] (the drawable-material
+         * fallback) it has a full inward fade (fadeOut 1); the dark variant narrows it to 0.8.
+         */
+        fun contentCapsule1(isDark: Boolean, enabled: Boolean = true): MaterialStrokeParams = when {
+            enabled && !isDark -> MaterialStrokeParams(0.4f, 2.8.dp, 0f, 0.1f, 1f, 1f)
+            enabled -> MaterialStrokeParams(0.6f, 2.8.dp, 0f, 0.08f, 1f, 0.8f)
+            !isDark -> MaterialStrokeParams(0.12f, 2.8.dp, 0f, 0.03f, 0.3f, 1f)
+            else -> MaterialStrokeParams(0.18f, 2.8.dp, 0f, 0.024f, 0.3f, 0.8f)
+        }
+
+        /** `TYPE_CONTENT_CAPSULE_2` — the system-material rim of a secondary (grey) `COUIButton`. */
+        fun contentCapsule2(isDark: Boolean, enabled: Boolean = true): MaterialStrokeParams = when {
+            enabled && !isDark -> MaterialStrokeParams(0.5f, 2.8.dp, 0f, 0.1f, 1f, 1f)
+            enabled -> MaterialStrokeParams(0.5f, 2.8.dp, 0f, 0.05f, 1f, 1f)
+            !isDark -> MaterialStrokeParams(0.15f, 2.8.dp, 0f, 0.03f, 0.3f, 1f)
+            else -> MaterialStrokeParams(0.15f, 2.8.dp, 0f, 0.015f, 0.3f, 1f)
+        }
 
         /** Resolves `TYPE_FRAMEWORK_CAPSULE_1` by night mode, as `getStrokeParamsByType` does. */
         fun frameworkCapsule1(isDark: Boolean): MaterialStrokeParams = if (isDark) FrameworkCapsule1Dark else FrameworkCapsule1Light

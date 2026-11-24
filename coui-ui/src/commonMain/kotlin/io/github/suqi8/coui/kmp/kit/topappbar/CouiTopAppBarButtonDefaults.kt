@@ -50,7 +50,11 @@ internal object CouiTopAppBarButtonDefaults {
             dark,
             circleShape,
             CouiCapsuleShape,
-            material = { capsule -> material(dark, capsule, search).copy(blurRadius = blurRadius) },
+            // Keys take the SDK's TOP_BAR material (ToolbarMaterialEffectResolver) as it is; only the
+            // search field keeps the darkened variant tuned for text on top of it.
+            material = { capsule ->
+                (if (search) material(dark, capsule, search) else systemMaterial(dark, capsule)).copy(blurRadius = blurRadius)
+            },
             shadow = { capsule -> shadow(dark, capsule, density, contour, search) },
             contentColor = LocalCouiToolbarContentColor.current.takeOrElse { colors.onSurface },
             textStyle = CouiTheme.typography.body,

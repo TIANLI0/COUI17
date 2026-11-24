@@ -34,6 +34,9 @@ private const val HOVER_ALPHA_DARK = 0x26 / 255f
 private const val PRESS_ALPHA_LIGHT = 0x1F / 255f
 private const val PRESS_ALPHA_DARK = 0x33 / 255f
 
+/** COUIMaskEffectDrawable: a press mask fades only after reaching this share of its full alpha. */
+private const val PRESS_MIN_VISIBLE_PROGRESS = 0.7f
+
 // COUIStrokeDrawable strokes `default_focus_stroke_radius` (3dp) on both sides of the edge.
 private val FocusStrokeWidth = 6.dp
 
@@ -125,6 +128,12 @@ class COUIIndication(
                             // otherwise keep the layer at full strength long after the finger is
                             // up, and a picture taken of the page would freeze it there.
                             pressedAnimation?.cancel()
+                            // COUIMaskEffectDrawable: a release before the press layer reached 70%
+                            // first lets it reach 70%, then fades — so a quick tap still flashes.
+                            val floor = pressAlpha * PRESS_MIN_VISIBLE_PROGRESS
+                            if (animatedAlpha.value > 0f && animatedAlpha.value < floor) {
+                                animatedAlpha.animateTo(targetValue = floor, animationSpec = StateLayerSpring)
+                            }
                             animatedAlpha.animateTo(
                                 targetValue = targetAlpha,
                                 animationSpec = StateLayerSpring,

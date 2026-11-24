@@ -70,3 +70,10 @@ internal fun CouiHapticEffect.toStandardHaptic(): HapticFeedbackType = when (thi
     CouiHapticEffect.EdgeList -> HapticFeedbackType.GestureThresholdActivate
     CouiHapticEffect.EdgeSqueeze -> HapticFeedbackType.LongPress
 }
+
+/**
+ * The system click sound a COUI control plays on a state change (`COUISwitch` toggling, through
+ * `View.playSoundEffect`). The platform only plays it when the user's "touch sounds" setting is on.
+ */
+@Composable
+expect fun rememberCouiClickSound(): () -> Unit

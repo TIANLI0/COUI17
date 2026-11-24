@@ -177,7 +177,7 @@ object SpotLightDefaults {
     val OpaqueMedium1Light: SpotLightParams = SpotLightParams(
         blendMode = BlendMode.Overlay,
         startIntensity = 0f,
-        endIntensity = 0.6f,
+        endIntensity = 0.8f,
         startRadius = 100f,
         endRadius = 500f,
         lightHeight = 200f,
@@ -207,6 +207,17 @@ object SpotLightDefaults {
         blendMode = BlendMode.Plus,
         endIntensity = 0.15f,
     )
+
+    /**
+     * `COUISpotLightEffect.TYPE_OPAQUE_SMALL_2` — the press light of a round glass title-bar / toolbar
+     * key (`ToolbarMaterialEffectDelegate`): [OpaqueMedium2Light]'s light at the same 500 radius.
+     */
+    val OpaqueSmall2Light: SpotLightParams = OpaqueMedium2Light
+    val OpaqueSmall2Dark: SpotLightParams = OpaqueMedium2Dark
+
+    /** `COUISpotLightEffect.TYPE_TRANSPARENT_MEDIUM_1` — a borderless / transparent `COUIButton`. */
+    val TransparentMedium1Light: SpotLightParams = OpaqueMedium2Light.copy(endIntensity = 0.5f)
+    val TransparentMedium1Dark: SpotLightParams = OpaqueMedium2Light.copy(endIntensity = 0.3f)
 
     /**
      * `COUISpotLightEffect.TYPE_OPAQUE_SMALL_1_LIGHT` — the light `FloatingButtonWrapper` puts on
@@ -378,6 +389,10 @@ object SpotLightDefaults {
     fun opaqueMedium1(isDark: Boolean): SpotLightParams = if (isDark) OpaqueMedium1Dark else OpaqueMedium1Light
 
     fun opaqueMedium2(isDark: Boolean): SpotLightParams = if (isDark) OpaqueMedium2Dark else OpaqueMedium2Light
+
+    fun opaqueSmall2(isDark: Boolean): SpotLightParams = if (isDark) OpaqueSmall2Dark else OpaqueSmall2Light
+
+    fun transparentMedium1(isDark: Boolean): SpotLightParams = if (isDark) TransparentMedium1Dark else TransparentMedium1Light
 
     /** Resolves `CIRCLE_PARAMS_1_LIGHT` / `_DARK` by night mode. */
     fun circleParams1(isDark: Boolean): SpotLightParams = if (isDark) CircleParams1Dark else CircleParams1Light

@@ -705,20 +705,24 @@ object DialogDefaults {
      * `coui_dialog_list_mix_blur_light` (`#DC909090`), handed to `OplusBlurParam.setMaterialParams`.
      * That platform shader weighs them as material params, not as `SrcOver` layers — stacked with
      * `SrcOver` the two greys could never come out lighter than 160, yet the live panel is (228,228,228).
-     * So the layer here is fitted to the measured output instead: a neutral grey at the same 86%
-     * weight as the native mix, which lands on 228 over a light page and lets the blurred page tint
-     * the remaining 14%.
+     * So the layer here is fitted to the output rather than stacked: a neutral grey at the blend
+     * colour's weight.
+     *
+     * The COUI SDK of ColorOS 17 apps (`COUIAlertDialogBuilder`) moved the light pair to blend
+     * `#CCEEEEEE` / mix `#99CDCDCD`; refitted the same way that is `#EEEEEE` at 80%, which lands on
+     * ~238 over a light page (the earlier `#DCE7E7E7` fit of the older pair landed on 228) and lets
+     * the blurred page tint the remaining 20%.
      */
     val BlurColorsLight: List<BlendColorEntry> = listOf(
-        BlendColorEntry(color = Color(0xDCE7E7E7)),
+        BlendColorEntry(color = Color(0xCCEEEEEE)),
     )
 
     /**
      * The tint of the dark dialog over its blur: the native recipe itself, not a fit.
      *
      * In night mode `COUIBackgroundBlurBuilder` hands `OplusBlurParam.setMaterialParams` mode 2 with
-     * `coui_dialog_list_blend_blur_dark` (`#B2292929`) and `coui_dialog_list_mix_blur_dark`
-     * (`#8C777777`). BlurService's composite shader (`librenderkit.so`, `bgBlend`) reads mode 2 as
+     * the blend and mix colours; the ColorOS 17 SDK (`COUIAlertDialogBuilder`) uses blend `#99262626`
+     * and mix `#665E5E5E` (an older SDK used `#B2292929` / `#8C777777`). BlurService's composite shader (`librenderkit.so`, `bgBlend`) reads mode 2 as
      * "luminosity + dodge": the blur takes the blend colour's luminance at its alpha, keeping its own
      * hue and saturation, then the mix colour dodges it at its alpha. Both steps are standard blend
      * modes, so the layers reproduce it exactly. Over a black page it lands on (42,42,42) against the
@@ -726,8 +730,8 @@ object DialogDefaults {
      * the panel — the translucency a flat grey layer erased.
      */
     val BlurColorsDark: List<BlendColorEntry> = listOf(
-        BlendColorEntry(color = Color(0xB2292929), mode = BlurBlendMode.Luminosity),
-        BlendColorEntry(color = Color(0x8C777777), mode = BlurBlendMode.ColorDodge),
+        BlendColorEntry(color = Color(0x99262626), mode = BlurBlendMode.Luminosity),
+        BlendColorEntry(color = Color(0x665E5E5E), mode = BlurBlendMode.ColorDodge),
     )
 
     /**
@@ -775,7 +779,7 @@ object DialogDefaults {
      *
      * ColorOS 17 draws the rim from `COUIShadowEdgeDrawable` fed by
      * `DialogShadowEdgeParamsExtKt.dialogShadowEdgeParamsDefault`, i.e. a 4dp / 0.6 alpha rim with
-     * a 0.4 inner-shadow fade in light mode and 2dp / 0.3 with 0.03 in dark mode. The panel uses
+     * a 0.6 inner-shadow fade in light mode and 2dp / 0.3 with 0.03 in dark mode. The panel uses
      * the `EDGE_STYLE_2` "large panel" preset, which is the same gradient the dialog root layout
      * installs.
      */
@@ -790,7 +794,7 @@ object DialogDefaults {
         MaterialStrokeParams(
             edgeAlpha = 0.6f,
             edgeWidth = 4.dp,
-            shadowFadeIn = 0.4f,
+            shadowFadeIn = 0.6f,
         )
     }
 

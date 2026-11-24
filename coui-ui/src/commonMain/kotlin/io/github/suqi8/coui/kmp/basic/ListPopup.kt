@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
@@ -1187,8 +1188,8 @@ object ListPopupDefaults {
     /**
      * COUI ColorOS 17 replaced the single main-menu `COUISpringForce` with three independent springs
      * per direction — one for the Bezier path parameter, one for scale, one for alpha — all carrying
-     * COUI's `SpringData` response/bounce pair converted by [folmeSpring] (`dampingRatio` comes from
-     * the bounce, `stiffness` from `39.47 / response²`, which is `(2π / response)²`).
+     * COUI's `SpringData` response/bounce pair converted by [folmeSpring] (`dampingRatio = 1 - bounce`,
+     * `stiffness` from `39.47 / response²`, which is `(2π / response)²`).
      *
      * Geometry and the six spring pairs come from `PopupGravityMotionParams`; the trajectory they
      * feed is built by [BezierGravityPathMath].
@@ -1197,10 +1198,12 @@ object ListPopupDefaults {
 
     /**
      * Path-parameter enter spring, driving the Bezier trajectory's `t` from 0 to 1
-     * (COUI `PopupGravityMotionParams.openPathSpring`, response 0.29 / bounce 0.13).
+     * (COUI `PopupGravityMotionParams.openPathSpring`, response 0.29 / bounce 0.13). AnimateKit's
+     * `SpringValueCalculator` turns a bounce into `dampingRatio = 1 - bounce`, so 0.87 — not the
+     * `1 - bounce / 2` this used to take, which halved the menu's overshoot.
      */
     val PathEnterAnimationSpec =
-        folmeSpring<Float>(damping = 0.935f, response = 0.29f, visibilityThreshold = 0.001f)
+        folmeSpring<Float>(damping = 0.87f, response = 0.29f, visibilityThreshold = 0.001f)
 
     /**
      * Path-parameter exit spring, driving the Bezier trajectory's `t` back to 0
@@ -1211,10 +1214,10 @@ object ListPopupDefaults {
 
     /**
      * Scale enter spring (COUI `PopupGravityMotionParams.openScaleSpring`, response 0.40 /
-     * bounce 0.20).
+     * bounce 0.20, i.e. `dampingRatio = 1 - bounce = 0.8`).
      */
     val FractionAnimationSpec =
-        folmeSpring<Float>(damping = 0.9f, response = 0.4f, visibilityThreshold = 0.001f)
+        folmeSpring<Float>(damping = 0.8f, response = 0.4f, visibilityThreshold = 0.001f)
 
     /**
      * Scale exit spring (COUI `PopupGravityMotionParams.closeScaleSpring`, response 0.21 /
@@ -1499,6 +1502,23 @@ internal fun Modifier.popupStaticBackdrop(
                     filterQuality = FilterQuality.Medium,
                 )
             }
+        }
+    }
+}
+
+/**
+ * [popupGlassBlendColors] painted over a captured page: the mix colour as a luminosity layer, then
+ * the blend colour as an overlay layer, each weighted by its own alpha — the colour adjustments libhwui
+ * applies to the live popup blur, here on a static image.
+ */
+internal fun Modifier.popupSnapshotTint(isDark: Boolean, shape: Shape): Modifier = drawWithCache {
+    val silhouette = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
+    val mix = if (isDark) PopupMixBlurDark else PopupMixBlurLight
+    val blend = if (isDark) PopupBlendBlurDark else PopupBlendBlurLight
+    onDrawBehind {
+        clipPath(silhouette) {
+            drawRect(color = mix, blendMode = BlendMode.Luminosity)
+            drawRect(color = blend, blendMode = BlendMode.Overlay)
         }
     }
 }
@@ -2139,7 +2159,8 @@ fun ListPopupContent(
                 // A closing panel keeps shrinking into its anchor; a drag that lands on it while it
                 // does belongs to the page beneath, so the disabled card must not catch the touch.
                 hitTestWhenDisabled = false,
-                lightEnabled = glassBackdrop != null,
+                // The captured-page glass is the same material, so it keeps the press light too.
+                lightEnabled = glassBackdrop != null || snapshotBackdrop != null,
                 shape = glassShape,
                 lightParams = SpotLightDefaults.translucentLarge1(isDark),
                 surface = Modifier
@@ -2159,9 +2180,17 @@ fun ListPopupContent(
                                 originInWindow = panelOriginInWindow,
                                 shape = glassShape,
                             )
-                            .background(
-                                color = backgroundColor.copy(alpha = surfaceAlpha),
-                                shape = glassShape,
+                            .then(
+                                if (snapshotBackdrop != null) {
+                                    // The live glass's tint pair, laid on the captured page instead of
+                                    // one flat 60% fill (that read milky in light, grey in dark).
+                                    Modifier.popupSnapshotTint(isDark, glassShape)
+                                } else {
+                                    Modifier.background(
+                                        color = backgroundColor.copy(alpha = surfaceAlpha),
+                                        shape = glassShape,
+                                    )
+                                },
                             ),
                         blurRadius = blurRadius,
                         blendColors = popupGlassBlendColors(),
