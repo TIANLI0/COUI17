@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -78,6 +79,10 @@ import io.github.suqi8.coui.kmp.preference.RadioButtonPreference
 import io.github.suqi8.coui.kmp.preference.SwitchPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.tianli0.coui17.patterns.ActionTone
+import io.github.tianli0.coui17.patterns.ComposerKey
+import io.github.tianli0.coui17.patterns.ComposerKeyGap
+import io.github.tianli0.coui17.patterns.InputPill
+import io.github.tianli0.coui17.patterns.InputPillState
 import io.github.tianli0.coui17.patterns.EmptyMessage
 import io.github.tianli0.coui17.patterns.ErrorState
 import io.github.tianli0.coui17.patterns.ExpandBody
@@ -629,7 +634,7 @@ fun ListsPage(onBack: () -> Unit) {
 @Composable
 fun GlassPage(onBack: () -> Unit) {
     var draft by rememberSaveable { mutableStateOf("") }
-    val sent = tr("已发送", "Sent")
+    val voice = tr("语音", "Voice")
     val pageColor = pageContainerColor()
     // The list is recorded as a layer; the floating controls below are its siblings and blur it.
     val backdrop = if (isRuntimeShaderSupported()) {
@@ -651,7 +656,7 @@ fun GlassPage(onBack: () -> Unit) {
                     androidx.compose.foundation.layout.PaddingValues(top = it.calculateTopPadding(), bottom = 120.dp)
                 },
             ) {
-                item { Note(tr("向上滚动，看彩色卡片从输入栏和标题栏下方经过。", "Scroll and watch the coloured cards pass under the composer and the title bar.")) }
+                item { Note(tr("向上滚动，看彩色卡片从输入栏和标题栏下方经过；输入文字后发送键会填上强调色。", "Scroll and watch the coloured cards pass under the composer and the title bar; type and the send key fills with the accent.")) }
                 items((0 until 18).toList()) { index ->
                     val color = swatches[index % swatches.size]
                     Row(
@@ -682,25 +687,21 @@ fun GlassPage(onBack: () -> Unit) {
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
                         .navigationBarsPadding()
+                        .imePadding()
                         .padding(horizontal = PageDefaults.CardGutter, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Bottom,
                 ) {
-                    HighlightedIconButton(onClick = {}, backdrop = backdrop) { Icon(COUIIcons.Mic, contentDescription = tr("语音", "Voice")) }
-                    Box(
-                        Modifier.weight(1f).height(40.dp).glassSurface(RoundedCornerShape(20.dp)).padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.CenterStart,
-                    ) {
-                        Text(
-                            draft.ifEmpty { tr("玻璃胶囊", "A glass capsule") },
-                            style = COUITheme.textStyles.body1,
-                            color = COUITheme.colorScheme.onSurfaceVariantSummary,
-                            maxLines = 1,
-                        )
-                    }
-                    HighlightedIconButton(onClick = { draft = sent }, backdrop = backdrop) {
-                        Icon(COUIIcons.Send, contentDescription = tr("发送", "Send"), tint = COUITheme.colorScheme.primary)
-                    }
+                    ComposerKey(label = voice, onClick = {}) { Icon(COUIIcons.Mic, contentDescription = null) }
+                    Spacer(Modifier.width(ComposerKeyGap))
+                    InputPill(
+                        value = draft,
+                        onValueChange = { draft = it },
+                        placeholder = tr("说点什么…", "Say something…"),
+                        sendLabel = tr("发送", "Send"),
+                        onSend = { draft = "" },
+                        state = InputPillState(enabled = true, sendEnabled = draft.isNotBlank(), busy = false),
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
         }

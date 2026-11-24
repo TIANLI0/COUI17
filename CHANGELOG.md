@@ -13,7 +13,10 @@ First release as a standalone repository.
   helpers, `GroupCard`, the button tiers (`SmallButton`, `LinkButton`, `ActionTone`), `PanelSheet`
   / `SheetButtons` / `ConfirmDialog` / `FullScreenDialog`, `GlassMenu` and `rememberPopupGlass`,
   `glassSurface` / `glassHeader`, state views (`LoadingState`, `ErrorState`, `EmptyMessage`,
-  `NoticeBanner`, `StatusPill`), `ExpandBody` and `TextInput`.
+  `NoticeBanner`, `StatusPill`), `ExpandBody` and `TextInput`; the composer (`InputPill`,
+  `ComposerKey`, `RoundIconButton`); dense rows and capsules (`CollapsibleRow`, `InfoChip`,
+  `StatFigure`, `StatusDot`, `Modifier.segment`); cards (`ChatBubble`, `AttentionCard`,
+  `TimelineCard`) and `StepButtons`.
 - A gallery application.
 - Maven publications `io.github.tianli0.coui17:<module>` (local repository).
 - CI, and a daily workflow that follows upstream and merges it when it is safe to.

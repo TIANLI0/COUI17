@@ -42,7 +42,7 @@ coui 的 `Button` / `TextButton` 不传参数时是 **Large**：44dp 的实心�
 
 | 层级 | 组件 | 外观 | 用在哪 |
 | :--- | :--- | :--- | :--- |
-| Large | `Button` / `TextButton`、`SheetButtons` | 44dp 胶囊 | 决策面板或引导步骤的末尾。一屏只有一个实心按钮；页面内部不用 |
+| Large | `Button` / `TextButton`、`SheetButtons`、`StepButtons` | 44dp 胶囊 | 决策面板或引导步骤的末尾。一屏只有一个实心按钮；页面内部不用 |
 | 面板确认 | `PanelSheet(confirm = SheetConfirm(…))` | 面板工具栏里的 40dp 强调色胶囊 | 完成一个表单面板的动作（新建 → 创建），键盘弹出时仍可见 |
 | Small | `SmallButton(text, onClick, tone)` | 28dp 胶囊，14sp | 行、卡片、工具栏里的操作。从不撑满宽度；多个并排时间距 8dp |
 | Link | `LinkButton(text, onClick)` | 无底色的强调色文字，36dp 触摸高度 | 列表页脚（加载更多、查看全部）、文字旁的操作（刷新、管理） |
@@ -60,6 +60,7 @@ COUI 的配色里有好几个强调色槽位：`primary`、`primaryContainer`、
 - **只有浮在内容之上的东西才是玻璃**：标题栏、导航胶囊、悬浮输入栏和按键、弹出菜单、对话框。卡片和页面是不透明的。
 - 悬浮控件的表面用 `Modifier.glassSurface(shape)`，页面把它下方的列表录成 `LayerBackdrop` 并通过 `LocalGlassBackdrop` 提供。控件必须是被录制层的兄弟节点。
 - 这个材质用的是 ColorOS 17 悬浮工具栏的着色层（含 `Luminosity` 层），不是“卡片色加透明度”。后者在深色模式下会把白色文字的亮度透上来，看起来是一块浅灰的板。
+- **输入栏是一条 ColorOS 工具栏。** 一行：附加键、输入框、发送键。键用 `ComposerKey`（和标题栏返回键同款的 40dp 玻璃圆键，间距 `ComposerKeyGap` = 10dp），输入框用 `InputPill`：40dp 胶囊，随文字长高，有内容可发时发送键填上强调色。不要在一行里混用三种不同做法的圆键。
 - 小标题栏压在密集文字上时，用 `glassHeader`（`Page` 在沉浸式小标题页上自动使用）：比 coui 自带的渐变材质更强，标题下方的文字不会干扰阅读。
 - 弹出菜单在自己的窗口里，没有页面可模糊。`GlassMenu` 在打开时对 Activity 窗口做一次 1/8 尺寸的 PixelCopy 并做盒式模糊，作为菜单的静态背景。
 - 条件不满足时（Android 13 以下、系统关闭模糊、测试环境）一律退回不透明填充，布局不变。
