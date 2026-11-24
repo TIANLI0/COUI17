@@ -128,8 +128,12 @@ fun rememberPopupGlass(active: Boolean): PopupGlass? {
 /** An eighth of the window is plenty under a blur and keeps the bitmap around 200 KB. */
 private const val CAPTURE_DOWNSCALE = 8
 
-/** Three box passes approximate a Gaussian; 4px at 1/8 scale is about a 32px (≈ 10dp) radius each. */
-private const val BLUR_RADIUS = 4
+/**
+ * Three box passes approximate a Gaussian. The popup material blurs at 25px
+ * (`RoundFrameLayout`); three passes of radius 3 at 1/8 scale give σ ≈ 3.2 × 8 ≈ 26px (radius 4
+ * gave ≈ 36px, 1.4 times the device).
+ */
+private const val BLUR_RADIUS = 3
 private const val BLUR_PASSES = 3
 
 private fun Context.findActivity(): Activity? {

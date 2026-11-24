@@ -20,6 +20,13 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.LayoutDirection
+import io.github.suqi8.coui.kmp.basic.MaterialStrokeParams
+import io.github.suqi8.coui.kmp.basic.materialShadowEdge
 import io.github.suqi8.coui.kmp.basic.BottomFloatingToolbarDefaults
 import io.github.suqi8.coui.kmp.basic.couiGlassSurface
 import io.github.suqi8.coui.kmp.blur.Backdrop
@@ -46,16 +53,27 @@ val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
  * colour: its `Luminosity` layer pulls whatever is behind to the surface's own brightness, so the
  * glass stays dark over white text in the dark theme and light over dark text in the light one (a
  * plain alpha tint lets bright content through and reads as a light-grey slab in dark mode).
- * [tint] adds a state's colour on top. A hairline rim, clipped to [shape]. Without a
- * [LocalGlassBackdrop] it is the opaque card colour. [halo] adds the [floatingHalo] under it: for
- * the controls of a floating toolbar (its keys and its field), not for small capsules in a header.
+ * [tint] adds a state's colour on top. The rim is ColorOS's material edge, a light line with an
+ * inward fade: `TYPE_FRAMEWORK_CIRCLE_1` for a round key ([circle]), `TYPE_FRAMEWORK_CAPSULE_1`
+ * for a capsule or field, as the keys and fields of a COUI floating toolbar wear them (it used to be
+ * a 0.5dp solid hairline, dark on the light theme). Without runtime shaders the hairline stays.
+ * Without a [LocalGlassBackdrop] it is the opaque card colour. [halo] adds the [floatingHalo] under
+ * it: for the controls of a floating toolbar (its keys and its field), not for small capsules in a
+ * header.
  */
 @Composable
-fun Modifier.glassSurface(shape: Shape, tint: Color? = null, halo: Boolean = false): Modifier {
+fun Modifier.glassSurface(
+    shape: Shape,
+    tint: Color? = null,
+    halo: Boolean = false,
+    circle: Boolean = shape == CircleShape,
+): Modifier {
     val scheme = COUITheme.colorScheme
     val dark = scheme.background.luminance() < 0.5f
     val fill = tint?.compositeOver(scheme.surfaceContainer) ?: scheme.surfaceContainer
     val rim = if (dark) Color.White.copy(alpha = 0.10f) else Color.Black.copy(alpha = 0.06f)
+    val density = LocalDensity.current
+    val stroke = if (circle) MaterialStrokeParams.frameworkCircle1(dark) else MaterialStrokeParams.frameworkCapsule1(dark)
     val layers = remember(dark, tint) {
         val base = if (dark) BottomFloatingToolbarDefaults.BlurColorsDark else BottomFloatingToolbarDefaults.BlurColorsLight
         if (tint != null) base + BlendColorEntry(color = tint) else base
@@ -70,7 +88,17 @@ fun Modifier.glassSurface(shape: Shape, tint: Color? = null, halo: Boolean = fal
             blurRadius = 24f,
             blendColors = layers,
         )
-        .border(0.5.dp, rim, shape)
+        .materialShadowEdge(
+            stroke = stroke,
+            fallback = Modifier.border(0.5.dp, rim, shape),
+            // The rim follows the control's own corners (a field that grows a line is no capsule).
+            cornerRadiusFor = { w, h ->
+                when (val o = shape.createOutline(Size(w, h), LayoutDirection.Ltr, density)) {
+                    is Outline.Rounded -> o.roundRect.topLeftCornerRadius.x
+                    else -> h / 2f
+                }
+            },
+        )
         .clip(shape)
 }
 
