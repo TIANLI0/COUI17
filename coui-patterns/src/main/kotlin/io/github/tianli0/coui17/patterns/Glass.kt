@@ -149,18 +149,22 @@ fun GlassGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     val dark = COUITheme.colorScheme.background.luminance() < 0.5f
     val layers = remember(dark) { glassLayers(dark, null) }
     val fill = COUITheme.colorScheme.surfaceContainer
-    Box(
-        modifier
-            .onGloballyPositioned { state.origin = it }
-            .couiGlassSurface(
-                backdrop = LocalGlassBackdrop.current,
-                shape = { UnionShape(state.parts.values.toList()) },
-                containerColor = fill,
-                fallback = Modifier,
-                blurRadius = GLASS_BLUR_RADIUS,
-                blendColors = layers,
-            ),
-    ) {
+    Box(modifier.onGloballyPositioned { state.origin = it }) {
+        // The blur is its own layer behind the content: drawn on the group itself it clipped
+        // everything inside to the members' outlines, and anything else there (a picked photo's
+        // thumbnail, a note) disappeared.
+        Box(
+            Modifier
+                .matchParentSize()
+                .couiGlassSurface(
+                    backdrop = LocalGlassBackdrop.current,
+                    shape = { UnionShape(state.parts.values.toList()) },
+                    containerColor = fill,
+                    fallback = Modifier,
+                    blurRadius = GLASS_BLUR_RADIUS,
+                    blendColors = layers,
+                ),
+        )
         CompositionLocalProvider(LocalGlassGroup provides state) { content() }
     }
 }
