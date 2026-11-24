@@ -134,12 +134,13 @@ fun ScrollToTopBlocker(active: Boolean) {
  */
 @Composable
 fun ScrollToTopHost(content: @Composable () -> Unit) {
-    val existing = LocalScrollToTopController.current
-    val ownController = rememberScrollToTopController()
-    if (existing == null) {
-        PlatformStatusBarScrollToTopEffect(ownController)
+    if (LocalScrollToTopController.current != null) {
+        content()
+        return
     }
-    CompositionLocalProvider(LocalScrollToTopController provides (existing ?: ownController)) {
+    val controller = rememberScrollToTopController()
+    PlatformStatusBarScrollToTopEffect(controller)
+    CompositionLocalProvider(LocalScrollToTopController provides controller) {
         content()
     }
 }
@@ -159,9 +160,14 @@ fun ScrollToTopPage(
     content: @Composable () -> Unit,
 ) {
     val parent = LocalScrollToTopController.current
+    if (parent == null) {
+        content()
+        return
+    }
     val detached = rememberScrollToTopController()
-    val target = if (parent == null || active) parent else detached
-    CompositionLocalProvider(LocalScrollToTopController provides target) {
+    CompositionLocalProvider(
+        LocalScrollToTopController provides if (active) parent else detached,
+    ) {
         content()
     }
 }
