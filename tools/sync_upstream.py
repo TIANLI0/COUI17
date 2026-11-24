@@ -137,7 +137,7 @@ def main() -> int:
 
     if not args.no_patches:
         apply_patches(dest)
-    (dest / "UPSTREAM_SHA").write_text(sha + "\n", encoding="utf-8")
+    (dest / "UPSTREAM_SHA").write_text(sha + "\n", encoding="utf-8", newline="\n")
     print(f"synced upstream coui17 @ {sha} into {dest}")
     return 0
 
