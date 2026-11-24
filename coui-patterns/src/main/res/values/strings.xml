@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="coui17_action_back">Back</string>
+    <string name="coui17_action_cancel">Cancel</string>
+    <string name="coui17_action_close">Close</string>
+</resources>

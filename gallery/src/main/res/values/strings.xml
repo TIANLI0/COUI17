@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COUI17</string>
+    <color name="launcher_background">#0066FF</color>
+    <style name="Theme.Gallery" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+</resources>

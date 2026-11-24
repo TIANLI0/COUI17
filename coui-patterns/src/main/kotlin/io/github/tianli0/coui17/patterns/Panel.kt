@@ -1,0 +1,190 @@
+// Copyright 2026, COUI17 contributors
+// SPDX-License-Identifier: Apache-2.0
+
+package io.github.tianli0.coui17.patterns
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import io.github.suqi8.coui.kmp.basic.Button
+import io.github.suqi8.coui.kmp.basic.ButtonDefaults
+import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.layout.BottomSheetDefaults
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
+import io.github.suqi8.coui.kmp.layout.SheetCloseCapsule
+import io.github.suqi8.coui.kmp.theme.COUITheme
+import io.github.suqi8.coui.kmp.theme.LocalDismissState
+import io.github.suqi8.coui.kmp.utils.RemovePlatformDialogDefaultEffects
+import io.github.suqi8.coui.kmp.window.WindowAlertDialog
+import io.github.suqi8.coui.kmp.window.WindowBottomSheet
+
+/** The confirming action of a form panel ("create", "save"): the accent capsule at the end of its toolbar. */
+data class SheetConfirm(val text: String, val enabled: Boolean = true, val testTag: String? = null, val onClick: () -> Unit)
+
+/**
+ * A ColorOS 17 half-screen panel: a coui `WindowBottomSheet` drawn on the **page colour** with the
+ * page's own gutters (the sheet's inside margin is off), so a [GroupCard] reads as a card 16dp from
+ * the edge exactly as it does on a page. On the default sheet colour, cards are white on white.
+ *
+ * Its toolbar is one row: the close capsule (wired through `LocalDismissState` so it animates
+ * out), the centred [title], and — for a form — [confirm] as an accent capsule, which stays in view
+ * while the keyboard is open. A panel that asks for a decision ends with [SheetButtons] instead.
+ * Loose text inside uses [PageDefaults.TextGutter].
+ */
+@Composable
+fun PanelSheet(
+    show: Boolean,
+    title: String?,
+    onDismissRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+    confirm: SheetConfirm? = null,
+    endAction: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
+) {
+    WindowBottomSheet(
+        show = show,
+        modifier = modifier,
+        title = null,
+        startAction = null,
+        endAction = null,
+        backgroundColor = pageContainerColor(),
+        insideMargin = DpSize(0.dp, 0.dp),
+        onDismissRequest = onDismissRequest,
+    ) {
+        val dismissState = LocalDismissState.current
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PageDefaults.CardGutter)
+                    .heightIn(min = BottomSheetDefaults.HeaderHeight),
+            ) {
+                SheetCloseCapsule(
+                    onClick = { dismissState?.invoke() ?: onDismissRequest() },
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+                if (title != null) {
+                    Text(
+                        text = title,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = if (confirm != null) 84.dp else 68.dp),
+                        style = COUITheme.textStyles.headline1,
+                        fontWeight = FontWeight.SemiBold,
+                        color = COUITheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                val end: (@Composable () -> Unit)? = endAction ?: confirm?.let { c -> { SheetConfirmCapsule(c) } }
+                if (end != null) {
+                    Box(modifier = Modifier.align(Alignment.CenterEnd)) { end() }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            content()
+        }
+    }
+}
+
+/** The toolbar's confirming capsule: the close capsule's 40dp height, filled with the accent. */
+@Composable
+private fun SheetConfirmCapsule(confirm: SheetConfirm) {
+    val colors = ButtonDefaults.buttonColorsPrimary()
+    Button(
+        onClick = confirm.onClick,
+        enabled = confirm.enabled,
+        colors = colors,
+        minHeight = BottomSheetDefaults.ActionButtonSize,
+        minWidth = 60.dp,
+        insideMargin = PaddingValues(horizontal = 16.dp),
+        modifier = if (confirm.testTag != null) Modifier.testTag(confirm.testTag) else Modifier,
+    ) {
+        Text(
+            confirm.text,
+            style = compactButtonTextStyle(),
+            color = if (confirm.enabled) colors.contentColor else colors.disabledContentColor,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * The actions under a panel that asks for a decision (not a form): the COUI17 button bar — two 44dp
+ * capsules side by side, or stacked when there are three or the labels are long — 16dp in from the
+ * panel's edges. [primary] is the filled one.
+ */
+@Composable
+fun SheetButtons(
+    primary: DialogButtonBarAction?,
+    modifier: Modifier = Modifier,
+    secondary: DialogButtonBarAction? = null,
+    tertiary: DialogButtonBarAction? = null,
+) {
+    // Stacked, the bar reads neutral / positive / negative: the primary action goes first.
+    val recommended = primary?.copy(recommended = true)
+    DialogButtonBar(
+        negative = if (tertiary != null) tertiary else secondary,
+        positive = if (tertiary != null) secondary else recommended,
+        neutral = if (tertiary != null) recommended else null,
+        modifier = modifier.fillMaxWidth(),
+    )
+}
+
+/**
+ * A page shown in its own window over the current one (a viewer, an editor). The window runs edge
+ * to edge like the activity's: [content] draws under the status and navigation bars and pads
+ * itself with the insets, and there is no dim or window animation. A plain `Dialog` stops at the
+ * bars and leaves a strip of its own colour there.
+ */
+@Composable
+fun FullScreenDialog(onDismissRequest: () -> Unit, content: @Composable () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        RemovePlatformDialogDefaultEffects()
+        content()
+    }
+}
+
+/** The centred COUI17 confirmation for a write: title, one message, cancel | confirm. */
+@Composable
+fun ConfirmDialog(
+    show: Boolean,
+    title: String,
+    message: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    cancelText: String = stringResource(R.string.coui17_action_cancel),
+) {
+    WindowAlertDialog(
+        show = show,
+        onConfirm = onConfirm,
+        onCancel = onDismiss,
+        title = title,
+        summary = message,
+        confirmText = confirmText,
+        cancelText = cancelText,
+    )
+}

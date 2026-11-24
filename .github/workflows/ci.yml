@@ -1,0 +1,55 @@
+name: CI
+
+# Builds every library module, runs the unit tests, publishes to the local Maven repository (which
+# proves the publications resolve) and assembles the gallery.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-37.2 build-tools;37.0.0 platform-tools"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon :coui-patterns:testDebugUnitTest
+
+      - name: Publish libraries to the local Maven repository
+        run: ./gradlew --no-daemon publishToMavenLocal
+
+      - name: Build the gallery
+        run: ./gradlew --no-daemon :gallery:assembleDebug
+
+      - name: Upload the gallery APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: coui17-gallery-debug
+          path: gallery/build/outputs/apk/debug/*.apk

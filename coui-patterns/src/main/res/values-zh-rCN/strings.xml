@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="coui17_action_back">返回</string>
+    <string name="coui17_action_cancel">取消</string>
+    <string name="coui17_action_close">关闭</string>
+</resources>

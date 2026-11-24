@@ -1,0 +1,117 @@
+# Upstream
+
+COUI17 is a downstream of [Costben/coui17](https://github.com/Costben/coui17). This page says what
+comes from there, what is this repository's own, what was changed, and how the two are kept in step.
+
+## Lineage
+
+| Order | Repository | Role |
+| :--- | :--- | :--- |
+| 1 | [`compose-miuix-ui/miuix`](https://github.com/compose-miuix-ui/miuix) | The original project: a MIUI / HyperOS styled Compose Multiplatform library. |
+| 2 | [`suqi8/coui`](https://github.com/suqi8/coui) | Rethemes Miuix to ColorOS 16, renames modules to `coui-*` and packages to `io.github.suqi8.coui.kmp`. |
+| 3 | [`Costben/coui17`](https://github.com/Costben/coui17) | Continues it towards ColorOS 17. **The direct upstream of this repository.** |
+| 4 | this repository | An Android-focused distribution of (3) with its own build, a patterns module, a gallery, and automatic syncing. |
+
+All of them are Apache-2.0; `NOTICE` and `THIRD-PARTY-LICENSES.md` carry the attributions. Files in
+`coui-ui/src/*/kotlin/io/github/suqi8/coui/kmp/kit/**` are ported from COUI-Kit and stay under
+MPL-2.0 with their headers; this repository is their published source.
+
+## What is whose
+
+| Path | Origin |
+| :--- | :--- |
+| `coui-{shader,blur,squircle,core,ui,preference,icons}/src/{commonMain,androidMain}` | Upstream, at the commit in [`UPSTREAM_SHA`](UPSTREAM_SHA), plus `patches/*.patch` |
+| `LICENSE`, `THIRD-PARTY-LICENSES.md` | Upstream |
+| `coui-*/build.gradle.kts`, `settings.gradle.kts`, `gradle/` | This repository (Android-only Kotlin Multiplatform modules, own toolchain versions) |
+| `coui-patterns/`, `gallery/`, `docs/`, `tools/`, `.github/` | This repository |
+
+Not taken from upstream: its other targets (iOS, desktop, web), `coui-nav` / `coui-navigation3-ui`,
+its sample apps, tests, documentation site and build logic. The package prefix
+`io.github.suqi8.coui.kmp` is kept so upstream changes apply without rewriting, and so code written
+against upstream compiles against this repository unchanged.
+
+The modules build with AGP 9.5 / Kotlin 2.4.21 / Compose Multiplatform 1.12 (upstream: AGP 9.3 /
+Kotlin 2.4.10 / CMP 1.11). `org.lsposed.hiddenapibypass` is not a dependency here (patch 0001).
+
+## Changes to upstream sources
+
+Each change is one file in `patches/`, re-applied in file-name order on every sync.
+
+### 0001 — no hidden-API bypass
+
+- **File:** `coui-ui/src/androidMain/…/basic/BottomBarBackdropRenderer.android.kt`
+- **Upstream:** on Android 16 devices *without* the Oplus framework, the native bottom-bar material
+  called the hidden `View.setBackdropRenderEffect(RenderEffect)` through
+  `org.lsposed.hiddenapibypass.HiddenApiBypass`.
+- **Here:** that fallback and its private helper class are removed, and the dependency is not
+  declared. Bypassing the non-SDK-interface restrictions is a Play-policy and stability risk.
+- **Effect:** on devices without the Oplus framework `rememberPlatformBottomBarBackdropRenderer()`
+  returns `null` and the bar is drawn by the portable Compose blur engine, as it already was below
+  API 36. The Oplus framework path is unchanged (and off by default, see `COUI17Theme`).
+
+### 0002 — localizable sheet close label
+
+- **File:** `coui-ui/src/commonMain/…/layout/BottomSheetContentLayout.kt`
+- **Upstream:** the close capsule of `WindowBottomSheet` is hard-coded as `"关闭"`.
+- **Here:** a public `LocalSheetCloseLabel` composition local (default `"关闭"`, so behaviour is
+  unchanged for apps that do not provide it). `COUI17Theme` provides it from string resources.
+
+### 0003 — dialog button fill without blur
+
+- **File:** `coui-ui/src/commonMain/…/layout/DialogButtonBar.kt`
+- **Upstream:** `DialogButtonBarDefaults.buttonFill()` always returns the frosted-panel capsule
+  (`#AAFFFFFF` light / `#33FFFFFF` dark). When the panel falls back to its flat fill, the light
+  panel is plain white and the capsule disappears: cancel / confirm read as bare text in light
+  theme only.
+- **Here:** when there is no backdrop or blur is off, `buttonFill()` returns the non-blur recipe
+  (`#14000000` / `#1AFFFFFF`). The frosted path is unchanged.
+
+### 0004 — small top app bar title marquee
+
+- **File:** `coui-ui/src/commonMain/…/basic/TopAppBar.kt`
+- **Upstream:** `SmallTopAppBar` cuts a long title or subtitle with an ellipsis.
+- **Here:** a public `LocalTopAppBarTitleMarquee` composition local (default `false`). When true,
+  title and subtitle use `basicMarquee`; text that fits does not move. `COUI17Theme` turns it on.
+
+All four are small, additive and off by default where they add behaviour, so they are candidates to
+send upstream; once upstream has one, delete its patch file.
+
+## Staying in step: automatic sync
+
+[`.github/workflows/upstream-sync.yml`](.github/workflows/upstream-sync.yml) runs every day (and
+from the Actions tab, optionally for a specific commit). When upstream's `main` has moved past
+`UPSTREAM_SHA` it:
+
+1. replaces the upstream-owned paths with upstream's and re-applies `patches/*.patch`
+   (`tools/sync_upstream.py`);
+2. checks what came in (`tools/upstream_review.py`): added lines that use a hidden-API bypass,
+   reflection, vendor-private framework classes, network / file / process access or broadcast
+   receivers, and any change to upstream's dependency catalog or module build files;
+3. runs the unit tests, publishes every module to the local Maven repository and builds the gallery.
+
+| Outcome | What happens |
+| :--- | :--- |
+| Patches apply, build is green, the check finds nothing | The sync is committed and **pushed to `main`** by the workflow. |
+| The build fails, or the check has findings | A pull request `upstream-sync/<sha>` is opened with the failure / findings and the upstream commit list. Nothing reaches `main` until a person merges it. |
+| A patch no longer applies | An issue is opened with the `git apply` error. Rebase or drop the patch, then re-run. |
+
+The check exists because a sync brings third-party code into `main` with no person reading it. It
+is a filter for the things this distribution promises not to do, not a security review: read the
+commit list in the run summary from time to time.
+
+Commits pushed by the workflow use the repository's `GITHUB_TOKEN`, so they do not start another CI
+run; the sync job has already built and tested exactly that tree.
+
+## Syncing by hand
+
+```bash
+git clone https://github.com/Costben/coui17 ../coui17-upstream
+python -I tools/sync_upstream.py --repo ../coui17-upstream --sha <full-40-char-sha>
+git add -A
+python -I tools/upstream_review.py --upstream ../coui17-upstream --old <previous-sha> --new <full-sha>
+./gradlew :coui-patterns:testDebugUnitTest publishToMavenLocal :gallery:assembleDebug
+python -I tools/gen_component_catalog.py
+```
+
+Then compare upstream's `NOTICE` with the section kept in this repository's, and check
+upstream's `gradle/libs.versions.toml` for dependency changes that the module build files here need.

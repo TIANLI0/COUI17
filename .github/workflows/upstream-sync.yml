@@ -1,0 +1,224 @@
+name: Upstream sync
+
+# Follows Costben/coui17 automatically.
+#
+# Every day (and on demand) this workflow looks at upstream's main branch. When it has moved past
+# the commit in UPSTREAM_SHA it
+#   1. replaces the upstream-owned sources with upstream's (tools/sync_upstream.py) and re-applies
+#      this repository's own changes from patches/*.patch,
+#   2. checks what came in (tools/upstream_review.py),
+#   3. builds everything and runs the tests,
+# and then
+#   - MERGES it into main by itself when the patches applied, the build is green and the check
+#     found nothing a person has to look at;
+#   - opens a pull request instead when the build fails or the check has findings (new reflection,
+#     network / file access, a change to upstream's dependencies, ...);
+#   - opens an issue when a patch no longer applies (nothing can be built in that state).
+#
+# coui-patterns, gallery, the build files and the docs are this repository's own and are never
+# touched by a sync.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Upstream commit to sync to (full SHA). Empty: the tip of upstream main."
+        required: false
+        default: ""
+      force_pull_request:
+        description: "Open a pull request even when the sync could be merged automatically."
+        type: boolean
+        default: false
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  UPSTREAM_REPO: https://github.com/Costben/coui17.git
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  sync:
+    name: Sync with upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Fetch upstream
+        id: upstream
+        env:
+          REQUESTED_SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          git clone --quiet --filter=blob:none --no-checkout "$UPSTREAM_REPO" "$RUNNER_TEMP/upstream"
+          old="$(tr -d '[:space:]' < UPSTREAM_SHA)"
+          if [ -n "$REQUESTED_SHA" ]; then
+            new="$(git -C "$RUNNER_TEMP/upstream" rev-parse --verify "${REQUESTED_SHA}^{commit}")"
+          else
+            new="$(git -C "$RUNNER_TEMP/upstream" rev-parse --verify "origin/HEAD^{commit}")"
+          fi
+          echo "old=$old" >> "$GITHUB_OUTPUT"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+          echo "short=${new:0:7}" >> "$GITHUB_OUTPUT"
+          if [ "$old" = "$new" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Already at upstream $new." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "Upstream moved: \`${old:0:7}\` → \`${new:0:7}\`"
+              echo
+              echo '```'
+              git -C "$RUNNER_TEMP/upstream" log --oneline --no-decorate "$old..$new" 2>/dev/null | head -n 60 || true
+              echo '```'
+            } | tee "$RUNNER_TEMP/upstream-log.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Apply upstream sources and this repository's patches
+        id: apply
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          set -uo pipefail
+          if python3 -I tools/sync_upstream.py --repo "$RUNNER_TEMP/upstream" --sha "${{ steps.upstream.outputs.new }}" > "$RUNNER_TEMP/sync.log" 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat "$RUNNER_TEMP/sync.log"
+          git add -A
+
+      - name: Report a patch that no longer applies
+        if: steps.upstream.outputs.changed == 'true' && steps.apply.outputs.ok != 'true'
+        run: |
+          set -euo pipefail
+          title="Upstream sync to ${{ steps.upstream.outputs.short }}: a patch no longer applies"
+          existing="$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number // empty')"
+          {
+            echo "The daily sync could not re-apply \`patches/*.patch\` on upstream \`${{ steps.upstream.outputs.new }}\`."
+            echo "Rebase the failing patch (or drop it if upstream fixed the same thing), then run the workflow again."
+            echo
+            echo '```'
+            tail -n 40 "$RUNNER_TEMP/sync.log"
+            echo '```'
+            echo
+            cat "$RUNNER_TEMP/upstream-log.md"
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/issue.md"
+          if [ -z "$existing" ]; then
+            gh issue create --title "$title" --body-file "$RUNNER_TEMP/issue.md"
+          else
+            gh issue comment "$existing" --body-file "$RUNNER_TEMP/issue.md"
+          fi
+          exit 1
+
+      - name: Check what came in
+        id: review
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          set -uo pipefail
+          python3 -I tools/upstream_review.py --upstream "$RUNNER_TEMP/upstream" \
+            --old "${{ steps.upstream.outputs.old }}" --new "${{ steps.upstream.outputs.new }}" > "$RUNNER_TEMP/review.txt"
+          code=$?
+          cat "$RUNNER_TEMP/review.txt"
+          if [ "$code" = "0" ]; then echo "clean=true" >> "$GITHUB_OUTPUT"; else echo "clean=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Setup Java
+        if: steps.upstream.outputs.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        if: steps.upstream.outputs.changed == 'true'
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-37.2 build-tools;37.0.0 platform-tools"
+
+      - name: Setup Gradle
+        if: steps.upstream.outputs.changed == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        id: build
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          set -uo pipefail
+          if ./gradlew --no-daemon :coui-patterns:testDebugUnitTest publishToMavenLocal :gallery:assembleDebug > "$RUNNER_TEMP/build.log" 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+          tail -n 60 "$RUNNER_TEMP/build.log"
+
+      - name: Commit
+        id: commit
+        if: steps.upstream.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "empty=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "empty=false" >> "$GITHUB_OUTPUT"
+          git commit --quiet -m "Sync upstream coui17 @ ${{ steps.upstream.outputs.short }}" \
+            -m "Costben/coui17 ${{ steps.upstream.outputs.old }}..${{ steps.upstream.outputs.new }}; patches/*.patch re-applied."
+
+      - name: Merge into main
+        if: >-
+          steps.upstream.outputs.changed == 'true' && steps.commit.outputs.empty == 'false' &&
+          steps.build.outputs.ok == 'true' && steps.review.outputs.clean == 'true' && !inputs.force_pull_request
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:${{ github.event.repository.default_branch }}"
+          echo "Merged into ${{ github.event.repository.default_branch }}." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open a pull request for review
+        if: >-
+          steps.upstream.outputs.changed == 'true' && steps.commit.outputs.empty == 'false' &&
+          (steps.build.outputs.ok != 'true' || steps.review.outputs.clean != 'true' || inputs.force_pull_request)
+        run: |
+          set -euo pipefail
+          branch="upstream-sync/${{ steps.upstream.outputs.short }}"
+          git push --force origin "HEAD:refs/heads/$branch"
+          {
+            echo "Automatic sync with Costben/coui17 \`${{ steps.upstream.outputs.new }}\`. It was **not** merged by itself:"
+            echo
+            if [ "${{ steps.build.outputs.ok }}" != "true" ]; then
+              echo "### The build fails"
+              echo '```'
+              grep -E '^e: |FAILED|What went wrong' -A2 "$RUNNER_TEMP/build.log" | head -n 60 || tail -n 40 "$RUNNER_TEMP/build.log"
+              echo '```'
+            fi
+            if [ "${{ steps.review.outputs.clean }}" != "true" ]; then
+              echo "### Needs a look"
+              echo '```'
+              head -n 80 "$RUNNER_TEMP/review.txt"
+              echo '```'
+            fi
+            echo "### Upstream commits"
+            cat "$RUNNER_TEMP/upstream-log.md"
+            echo
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          } > "$RUNNER_TEMP/pr.md"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')" ]; then
+            gh pr comment "$branch" --body-file "$RUNNER_TEMP/pr.md"
+          else
+            gh pr create --head "$branch" --base "${{ github.event.repository.default_branch }}" \
+              --title "Sync upstream coui17 @ ${{ steps.upstream.outputs.short }}" --body-file "$RUNNER_TEMP/pr.md"
+          fi
+          echo "Opened a pull request from $branch." >> "$GITHUB_STEP_SUMMARY"
