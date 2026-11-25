@@ -3,6 +3,9 @@
 package io.github.suqi8.coui.kmp.blur
 
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.GraphicsLayerScope
@@ -22,8 +25,9 @@ import io.github.suqi8.coui.kmp.blur.internal.InverseLayerScope
  *
  * A surface hosted in its own platform window (a `Dialog`) cannot sample the page it opens over:
  * that page is recorded in a different window, and a recorded layer cannot be read across windows.
- * The host captures the page once instead and hands it over as this backdrop, so the surface runs
- * the same blur and tint pipeline an in-window surface does, over a still of the same page.
+ * The host captures the page instead and hands it over as this backdrop, so the surface runs the
+ * same blur and tint pipeline an in-window surface does; the host re-captures whenever the page
+ * draws again and passes the new image to [update].
  *
  * Positions are matched on screen, because the consumer and the captured window live in different
  * windows whose origins need not coincide.
@@ -35,10 +39,29 @@ import io.github.suqi8.coui.kmp.blur.internal.InverseLayerScope
 @InternalCouiBlurApi
 @Stable
 class ImageBackdrop(
-    val image: ImageBitmap,
-    val sourceSize: IntSize,
-    val sourceOriginOnScreen: Offset,
+    image: ImageBitmap,
+    sourceSize: IntSize,
+    sourceOriginOnScreen: Offset,
 ) : Backdrop {
+
+    /** The current capture. Read while drawing, so replacing it redraws the consumers only. */
+    var image: ImageBitmap by mutableStateOf(image)
+        private set
+    var sourceSize: IntSize by mutableStateOf(sourceSize)
+        private set
+    var sourceOriginOnScreen: Offset by mutableStateOf(sourceOriginOnScreen)
+        private set
+
+    /**
+     * Replaces the capture with a newer one of the same window (the host keeps sampling while the
+     * surface is open, so the frost follows what changes underneath: streaming text, a list that
+     * scrolls on its own). Consumers redraw; nothing recomposes.
+     */
+    fun update(image: ImageBitmap, sourceSize: IntSize, sourceOriginOnScreen: Offset) {
+        this.image = image
+        this.sourceSize = sourceSize
+        this.sourceOriginOnScreen = sourceOriginOnScreen
+    }
 
     override val isCoordinatesDependent: Boolean = true
 

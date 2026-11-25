@@ -13,8 +13,8 @@ import io.github.suqi8.coui.kmp.blur.LocalBackdrop
  * own.
  *
  * A `Dialog` window has no page underneath it to sample, so a glass panel inside it would frost
- * nothing and show only its tint. While [active], this captures the host window once and exposes it
- * as a backdrop; [ProvideHostWindowBackdrop] then hands it to the dialog's content, which runs the
+ * nothing and show only its tint. While [active], this captures the host window, again whenever it
+ * draws (rate-limited), and exposes it as a backdrop; [ProvideHostWindowBackdrop] then hands it to the dialog's content, which runs the
  * same blur and tint as an in-window panel. Must be called in the host composition, outside the
  * `Dialog`, so it captures the page rather than the dialog.
  *
