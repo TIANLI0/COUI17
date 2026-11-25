@@ -108,7 +108,9 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
   that still.
 - **Here:** the host is captured again after each of its draws (at most every 33 ms, one copy in
   flight, three reused bitmaps); `ImageBackdrop` holds the capture as state read while drawing, so
-  only the consumers redraw. A host that does not draw is not copied again.
+  only the consumers redraw. A host that does not draw is not copied again, and a draw that lands
+  while a copy is in flight is copied after it, so the panel ends on the host's last frame
+  (`HostCaptureScheduler`, unit-tested in `coui-ui/src/androidHostTest`).
 
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.

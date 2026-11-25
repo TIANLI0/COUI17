@@ -15,6 +15,8 @@ kotlin {
         }
         buildToolsVersion = "37.0.0"
         minSdk = 23
+        // JVM unit tests of this repository's own logic (src/androidHostTest; not synced from upstream).
+        withHostTest {}
     }
 
     sourceSets {
@@ -29,6 +31,9 @@ kotlin {
         }
         androidMain.dependencies {
             // org.lsposed.hiddenapibypass intentionally NOT included: see UPSTREAM.md.
+        }
+        getByName("androidHostTest").dependencies {
+            implementation(libs.junit4)
         }
     }
 }
