@@ -36,7 +36,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.graphics.luminance
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.RotatingProgressIndicator
@@ -118,7 +121,16 @@ fun InputPill(
             if (state.busy) {
                 RotatingProgressIndicator(color = scheme.onSurfaceSecondary, size = 18.dp, ringDiameter = 14.4.dp, strokeWidth = 2.dp)
             } else {
-                Icon(sendIcon, contentDescription = null, tint = lerp(scheme.onSurfaceVariantSummary, scheme.onPrimary, ready), modifier = Modifier.size(20.dp))
+                // The arrow's colour follows `ready` while drawing: read here, in composition, it
+                // recomposed the whole composer (field included) on every frame of the change.
+                val arrow = rememberVectorPainter(sendIcon)
+                val idle = scheme.onSurfaceVariantSummary
+                val onAccent = scheme.onPrimary
+                Box(
+                    Modifier.size(20.dp).drawBehind {
+                        with(arrow) { draw(size, colorFilter = ColorFilter.tint(lerp(idle, onAccent, ready))) }
+                    },
+                )
             }
         }
     }
