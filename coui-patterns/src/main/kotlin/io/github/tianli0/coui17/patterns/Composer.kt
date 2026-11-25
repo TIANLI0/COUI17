@@ -91,7 +91,7 @@ fun InputPill(
             Modifier
                 .weight(1f)
                 .heightIn(min = ComposerKeySize)
-                .glassSurface(RoundedCornerShape(ComposerKeySize / 2), halo = true)
+                .glassSurface(RoundedCornerShape(ComposerKeySize / 2))
                 .padding(horizontal = 16.dp, vertical = 9.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
@@ -137,8 +137,8 @@ fun InputPill(
 }
 
 /**
- * A round key of a composer row: ColorOS 17's glass toolbar key over the content, with its halo,
- * press light and touch motion. [content] is drawn inside the 40dp disc.
+ * A round key of a composer row: a 40dp frosted glass disc over the content (blur only, see
+ * [glassSurface]) that dims lightly while pressed. [content] is drawn inside the disc.
  */
 @Composable
 fun ComposerKey(
@@ -170,7 +170,10 @@ fun ComposerKey(
     )
 }
 
-/** A 48dp round glass button floating over content (close a viewer, download), with the toolbar halo. */
+/**
+ * A 48dp round glass button floating over content (close a viewer, download). Blur only, like
+ * every [glassSurface]; add [floatingHalo] before it for the toolbar keys' shadow.
+ */
 @Composable
 fun RoundIconButton(
     icon: ImageVector,
@@ -183,7 +186,7 @@ fun RoundIconButton(
     Box(
         modifier
             .size(48.dp)
-            .glassSurface(CircleShape, halo = true)
+            .glassSurface(CircleShape)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = label, onClick = onClick)
             .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,

@@ -145,9 +145,10 @@ fun KeyValueRow(label: String, value: String, modifier: Modifier = Modifier, car
 
 /**
  * The body under a collapsible row: it grows out of the row's bottom edge and fades in, and folds
- * back the same way. COUI's expand motion (`ExpandableRecyclerConnector`): 400ms on
- * (0.3, 0, 0.1, 1) both ways, alpha equal to the shown fraction of the height — size and fade run
- * on the same curve, so they stay in step with the row's 400ms `ExpandArrow` turn.
+ * back the same way. COUI's expand curve (`ExpandableRecyclerConnector`, (0.3, 0, 0.1, 1)) both
+ * ways, in 300ms rather than COUI's 400ms (see [EXPAND_MS]), alpha equal to the shown fraction of
+ * the height — size and fade run on the same curve, so they stay in step with the row's
+ * `ExpandArrow` turn ([CollapsibleRow] turns it in the same time).
  */
 @Composable
 fun ExpandBody(expanded: Boolean, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {

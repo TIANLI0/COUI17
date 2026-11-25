@@ -65,7 +65,9 @@ val LocalIsDarkTheme = staticCompositionLocalOf { false }
  *   the library's own Compose blur engine. True lets it use the Oplus framework's native bar
  *   materials on ColorOS devices, which reflects into private `com.oplus.*` classes.
  * - **Localized chrome.** The sheet close capsule is labelled from this module's string resources
- *   (English / 简体中文), and long small-bar titles scroll instead of being cut ([titleMarquee]).
+ *   (English / 简体中文), so are the expanded / collapsed state words of [CollapsibleRow]
+ *   ([LocalExpandStateLabels]), and long small-bar titles scroll instead of being cut
+ *   ([titleMarquee]).
  */
 @Composable
 fun COUI17Theme(
@@ -120,6 +122,11 @@ fun COUI17Theme(
             }
         }
     }
+    // Localized state words for collapsible rows, unless the app set its own above the theme.
+    val inherited = LocalExpandStateLabels.current
+    val expanded = stringResource(R.string.coui17_state_expanded)
+    val collapsed = stringResource(R.string.coui17_state_collapsed)
+    val expandLabels = if (inherited !== DefaultExpandStateLabels) inherited else remember(expanded, collapsed) { expanded to collapsed }
     COUITheme(controller = controller) {
         CompositionLocalProvider(
             LocalIsDarkTheme provides dark,
@@ -127,6 +134,7 @@ fun COUI17Theme(
             LocalPlatformBottomBarMaterialEnabled provides platformMaterials,
             LocalSheetCloseLabel provides stringResource(R.string.coui17_action_close),
             LocalTopAppBarTitleMarquee provides titleMarquee,
+            LocalExpandStateLabels provides expandLabels,
             content = content,
         )
     }

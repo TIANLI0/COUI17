@@ -46,8 +46,14 @@ import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.squircle.SquircleShape
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
-/** Accessibility state words (expanded, collapsed) of collapsible rows; apps provide localized ones at their root. */
-val LocalExpandStateLabels = staticCompositionLocalOf { "expanded" to "collapsed" }
+/**
+ * Accessibility state words (expanded, collapsed) of collapsible rows. [COUI17Theme] provides them
+ * from this module's string resources (English / 简体中文) unless an enclosing provider has already
+ * set them; an app can still provide its own anywhere below the theme.
+ */
+val LocalExpandStateLabels = staticCompositionLocalOf { DefaultExpandStateLabels }
+
+internal val DefaultExpandStateLabels = "expanded" to "collapsed"
 
 /** Where a row sits inside a visually grouped card that spans several lazy-list items. */
 enum class SegmentPosition { None, Single, First, Middle, Last }
