@@ -1,0 +1,622 @@
+diff --git a/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiClickSound.android.kt b/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiClickSound.android.kt
+new file mode 100644
+--- /dev/null
++++ b/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiClickSound.android.kt
+@@ -0,0 +1,15 @@
++// Copyright 2026, compose-coui-ui contributors
++// SPDX-License-Identifier: Apache-2.0
++package io.github.suqi8.coui.kmp.utils
++
++import android.view.SoundEffectConstants
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
++import androidx.compose.ui.platform.LocalView
++
++@Composable
++actual fun rememberCouiClickSound(): () -> Unit {
++    val view = LocalView.current
++    // View.playSoundEffect honours Settings.System.SOUND_EFFECTS_ENABLED by itself.
++    return remember(view) { { view.playSoundEffect(SoundEffectConstants.CLICK) } }
++}
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt
+@@ -105,7 +105,7 @@ fun Button(
+     interactionSource: MutableInteractionSource? = null,
+     indication: Indication? = null,
+     size: ButtonSize = ButtonSize.Regular,
+-    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors),
++    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors, enabled),
+     spotLight: SpotLightParams? = ButtonDefaults.defaultSpotLight(colors),
+     backdrop: Backdrop? = null,
+     touchMotionEnabled: Boolean = true,
+@@ -234,7 +234,7 @@ fun Button(
+     }
+     // When touchMotionEnabled is active, couiTouchMotion drives both the rubber-band deformation and
+     // the clipped spotlight; when disabled, fall back to pressSpotLight so explicit spotLight still works.
+-    val standaloneLightModifier = if (!touchMotionEnabled && spotLight != null && fillColor.alpha > 0f) {
++    val standaloneLightModifier = if (!touchMotionEnabled && spotLight != null) {
+         Modifier.pressSpotLight(
+             params = spotLight,
+             shape = buttonShape,
+@@ -257,7 +257,7 @@ fun Button(
+                 motionState = touchMotionState,
+                 pressScaleEnabled = pressScaleEnabled,
+                 consumeDrag = false,
+-                lightEnabled = spotLight != null && fillColor.alpha > 0f,
++                lightEnabled = spotLight != null,
+             )
+         } else {
+             Modifier
+@@ -468,7 +468,7 @@ fun TextButton(
+     interactionSource: MutableInteractionSource? = null,
+     indication: Indication? = null,
+     size: ButtonSize = ButtonSize.Regular,
+-    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors),
++    edgeStroke: MaterialStrokeParams? = ButtonDefaults.defaultEdgeStroke(colors, enabled),
+     spotLight: SpotLightParams? = ButtonDefaults.defaultSpotLight(colors),
+     backdrop: Backdrop? = null,
+     touchMotionEnabled: Boolean = true,
+@@ -850,20 +850,23 @@ object ButtonDefaults {
+     }
+ 
+     /**
+-     * The rim `COUIButton` draws for [colors]: `TYPE_CONTENT_CAPSULE_4` for a filled accent
+-     * (`ButtonType.PRIMARY`) button, `TYPE_CONTENT_CAPSULE_5` for a secondary one, and none for a
+-     * borderless button whose fill is transparent.
++     * The rim `COUIButton` asks the system material for: `TYPE_CONTENT_CAPSULE_1` for a filled accent
++     * (`ButtonType.PRIMARY`) button, `TYPE_CONTENT_CAPSULE_2` for a secondary one, their `DISABLED`
++     * variants while [enabled] is false, and none for a borderless button whose fill is transparent.
++     * (`TYPE_CONTENT_CAPSULE_4` / `_5` are only the drawable-material fallback of a style that sets
++     * `drawableMaterialEffect`; they stay available as [MaterialStrokeParams.contentCapsule4] / `5`.)
+      */
+     @Composable
+-    fun defaultEdgeStroke(colors: ButtonColors): MaterialStrokeParams? = edgeStrokeFor(colors.color)
++    fun defaultEdgeStroke(colors: ButtonColors, enabled: Boolean = true): MaterialStrokeParams? = edgeStrokeFor(colors.color, enabled)
+ 
+     /** [defaultEdgeStroke] for [TextButtonColors]. */
+     @Composable
+-    fun defaultEdgeStroke(colors: TextButtonColors): MaterialStrokeParams? = edgeStrokeFor(colors.color)
++    fun defaultEdgeStroke(colors: TextButtonColors, enabled: Boolean = true): MaterialStrokeParams? = edgeStrokeFor(colors.color, enabled)
+ 
+     /**
+-     * The press spotlight `COUIButton` turns on for [colors]: [SpotLightDefaults.capsuleParams1] for
+-     * the recommend button (`ButtonType.PRIMARY`), `null` for every other type.
++     * The press spotlight `COUIButton` turns on for [colors]: `TYPE_OPAQUE_MEDIUM_1` for the recommend
++     * button (`ButtonType.PRIMARY`), `TYPE_OPAQUE_MEDIUM_2` for a filled secondary one and
++     * `TYPE_TRANSPARENT_MEDIUM_1` for a borderless one.
+      */
+     @Composable
+     fun defaultSpotLight(colors: ButtonColors): SpotLightParams? = spotLightFor(colors.color)
+@@ -873,23 +876,24 @@ object ButtonDefaults {
+     fun defaultSpotLight(colors: TextButtonColors): SpotLightParams? = spotLightFor(colors.color)
+ 
+     @Composable
+-    private fun edgeStrokeFor(fill: Color): MaterialStrokeParams? {
++    private fun edgeStrokeFor(fill: Color, enabled: Boolean): MaterialStrokeParams? {
+         if (fill.alpha == 0f) return null
+         val scheme = COUITheme.colorScheme
+         val isDark = scheme.background.luminance() < 0.5f
+         return when {
+-            isAccentFill(fill, scheme.containerTheme) -> MaterialStrokeParams.contentCapsule4(isDark)
+-            else -> MaterialStrokeParams.contentCapsule5(isDark)
++            isAccentFill(fill, scheme.containerTheme) -> MaterialStrokeParams.contentCapsule1(isDark, enabled)
++            else -> MaterialStrokeParams.contentCapsule2(isDark, enabled)
+         }
+     }
+ 
+     @Composable
+-    private fun spotLightFor(fill: Color): SpotLightParams? {
++    private fun spotLightFor(fill: Color): SpotLightParams {
+         val scheme = COUITheme.colorScheme
+-        return if (fill.alpha > 0f && isAccentFill(fill, scheme.containerTheme)) {
+-            SpotLightDefaults.capsuleParams1(scheme.background.luminance() < 0.5f)
+-        } else {
+-            null
++        val isDark = scheme.background.luminance() < 0.5f
++        return when {
++            fill.alpha == 0f -> SpotLightDefaults.transparentMedium1(isDark)
++            isAccentFill(fill, scheme.containerTheme) -> SpotLightDefaults.opaqueMedium1(isDark)
++            else -> SpotLightDefaults.opaqueMedium2(isDark)
+         }
+     }
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/COUITouchMotion.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/COUITouchMotion.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/COUITouchMotion.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/COUITouchMotion.kt
+@@ -60,7 +60,8 @@ data class COUITouchMotionSpec(
+     val maxScale: Float = 1.2f,
+     val k1: Int = 350000,
+     val k2: Int = 15,
+-    val pressScaleMin: Float = 0.88f,
++    // PressParamsExtKt: a normal-aspect target (aspect <= 2) scales between 0.85 and 0.97.
++    val pressScaleMin: Float = 0.85f,
+     val pressScaleMax: Float = 0.97f,
+     val pressMinAreaWidthDp: Float = 20f,
+     val pressMaxAreaWidthDp: Float = 150f,
+@@ -71,10 +72,11 @@ data class COUITouchMotionSpec(
+     val dragSpring: SpringSpec<Float> = folmeSpring(damping = 0.85f, response = 0.15f),
+     // COUISpringForce maps bounce to dampingRatio = 1 - bounce.
+     val handUpSpring: SpringSpec<Float> = folmeSpring(damping = 0.35f, response = 0.42f),
+-    // PressEngineConfig.DEFAULT_RESPONSE/BOUNCE_PRESS (0.13 / 0.18) and _RELEASE (0.35 / 0.62);
+-    // COUISpringForce maps bounce to dampingRatio = 1 - bounce.
+-    val pressSpring: SpringSpec<Float> = folmeSpring(damping = 0.82f, response = 0.13f),
+-    val releaseSpring: SpringSpec<Float> = folmeSpring(damping = 0.38f, response = 0.35f),
++    // The PressParams a normal-aspect target runs on at runtime (`COUIPressAnimatorUnit` replaces
++    // PressEngineConfig's DEFAULT_* 0.13 / 0.18 and 0.35 / 0.62 with them): press bounce 0 / response
++    // 0.25, release bounce 0.6 / response 0.5. COUISpringForce maps bounce to dampingRatio = 1 - bounce.
++    val pressSpring: SpringSpec<Float> = folmeSpring(damping = 1f, response = 0.25f),
++    val releaseSpring: SpringSpec<Float> = folmeSpring(damping = 0.4f, response = 0.5f),
+     val candyPressSpring: SpringSpec<Float> = folmeSpring(damping = 1f, response = 0.3f),
+     val candyReleaseSpring: SpringSpec<Float> = folmeSpring(damping = 0.5f, response = 0.5f),
+     // Additional COS17 PressCalc and hand-up resolver inputs follow the stable legacy fields.
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/HighlightedIconButton.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/HighlightedIconButton.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/HighlightedIconButton.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/HighlightedIconButton.kt
+@@ -56,7 +56,7 @@ import io.github.suqi8.coui.kmp.theme.LocalContentColor
+  * ColorOS gives the toolbar's back key and overflow key the same effect: a true 40dp circle — not a
+  * squircle — carrying a radial fill that is darker in the middle and brighter at the rim, an
+  * angle-distributed material perimeter highlight, and a theme-dependent halo outside the edge. While
+- * pressed the whole control springs to [HighlightedIconButtonDefaults.PressedScale], the rim and the
++ * pressed the whole control scales on the shared touch-motion press springs, the rim and the
+  * halo disappear and the fill and icon brighten; both themes behave identically.
+  *
+  * The rim uses the framework's material-luminance blend with TYPE_FRAMEWORK_CIRCLE_1 and
+@@ -114,7 +114,6 @@ fun HighlightedIconButton(
+     val isDark = scheme.background.luminance() < 0.5f
+     val density = LocalDensity.current
+     val blurScale = rememberToolbarAttenuatedBlurScale()
+-    val scale = 1f - (1f - HighlightedIconButtonDefaults.PressedScale) * pressProgress
+     val contentColor = lerp(
+         scheme.onBackground,
+         Color.White,
+@@ -166,17 +165,15 @@ fun HighlightedIconButton(
+                 .couiTouchMotion(
+                     enabled = enabled,
+                     motionState = touchMotion,
+-                    pressScaleEnabled = false,
++                    // `ToolbarMaterialEffectDelegate` runs the key on the standard COUIViewTouchAnimator
++                    // (deformation, rubber band, press scale on the shared PressParams springs).
++                    pressScaleEnabled = true,
+                     // The light belongs to the disc; a plain circle clip on the pressed box would
+                     // light a pill around it.
+                     shape = lightShape,
+-                    lightParams = SpotLightDefaults.circleParams1(isDark),
++                    // TYPE_OPAQUE_SMALL_2, the toolbar key's press light.
++                    lightParams = SpotLightDefaults.opaqueSmall2(isDark),
+                     lightEnabled = spotLightEnabled,
+-                    extraTransform = {
+-                        // Press shrink and native drag deformation belong to one visual layer.
+-                        scaleX += scale - 1f
+-                        scaleY += scale - 1f
+-                    },
+                 )
+                 .then(clickableModifier),
+             contentAlignment = Alignment.Center,
+@@ -185,7 +182,10 @@ fun HighlightedIconButton(
+                 modifier = Modifier.size(size),
+                 contentAlignment = Alignment.Center,
+             ) {
+-                if (isDark) {
++                // `ToolbarMaterialEffectDelegate` casts `coui_caustic_color_1` under the key in both
++                // themes (#33FFFFFF dark, #2EFFFFFF light) beside the level-6 shadow; the light
++                // theme's drop halo below stands in for that shadow.
++                run {
+                     MaterialCausticShadow(
+                         particles = listOf(
+                             CausticShadowParticle(
+@@ -193,9 +193,9 @@ fun HighlightedIconButton(
+                                 CausticShadowProfile.Toolbar,
+                             ),
+                         ),
+-                        color = HighlightedIconButtonDefaults.DarkHaloColor.copy(
+-                            alpha = HighlightedIconButtonDefaults.DarkHaloColor.alpha * (1f - pressProgress).coerceIn(0f, 1f),
+-                        ),
++                        color = HighlightedIconButtonDefaults.causticColor(isDark).let { c ->
++                            c.copy(alpha = c.alpha * (1f - pressProgress).coerceIn(0f, 1f))
++                        },
+                         modifier = Modifier.matchParentSize(),
+                     )
+                 }
+@@ -238,7 +238,15 @@ fun HighlightedIconButton(
+                                 center = center,
+                             )
+                             drawContent()
+-                        },
++                        }
++                        // TYPE_FRAMEWORK_CIRCLE_1's second half: the fade inward from the rim
++                        // (fadeIn 0.15 light / 0.1 dark, fadeOut 1), over the fill, under the icon.
++                        .materialInnerGlow(
++                            cornerRadius = size / 2,
++                            cornerWeight = MaterialShadowEdgeDefaults.CapsuleCornerWeight,
++                            fade = MaterialStrokeParams.frameworkCircle1(isDark).copy(edgeAlpha = 0f),
++                            shadowStyle = InnerShadowStyle.SHADOW_STYLE_0,
++                        ),
+                 )
+                 // Keep the icon out of the material RGB effect.
+                 Box(modifier = Modifier.matchParentSize(), contentAlignment = Alignment.Center, content = content)
+@@ -428,6 +436,12 @@ object HighlightedIconButtonDefaults {
+     /** ToolbarMaterialEffectDelegate uses coui_caustic_color_1: 0x33ffffff at night. */
+     val DarkHaloColor = Color.White.copy(alpha = 51f / 255f)
+ 
++    /** `coui_caustic_color_1` in the light theme, #2EFFFFFF. */
++    val LightCausticColor = Color.White.copy(alpha = 46f / 255f)
++
++    /** The caustic light cast under the key: [DarkHaloColor] dark, [LightCausticColor] light. */
++    fun causticColor(isDark: Boolean): Color = if (isDark) DarkHaloColor else LightCausticColor
++
+     /** Native level-2 bottom layout offset; the SDF fades before reaching the draw rectangle. */
+     val DarkHaloExtent = 4.899994.dp
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt
+@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.FilterQuality
+ import androidx.compose.ui.graphics.GraphicsLayerScope
+ import androidx.compose.ui.graphics.ImageBitmap
+ import androidx.compose.ui.graphics.Paint
++import androidx.compose.ui.graphics.BlendMode
+ import androidx.compose.ui.graphics.Path
+ import androidx.compose.ui.graphics.Shape
+ import androidx.compose.ui.graphics.TransformOrigin
+@@ -1187,8 +1188,8 @@ object ListPopupDefaults {
+     /**
+      * COUI ColorOS 17 replaced the single main-menu `COUISpringForce` with three independent springs
+      * per direction — one for the Bezier path parameter, one for scale, one for alpha — all carrying
+-     * COUI's `SpringData` response/bounce pair converted by [folmeSpring] (`dampingRatio` comes from
+-     * the bounce, `stiffness` from `39.47 / response²`, which is `(2π / response)²`).
++     * COUI's `SpringData` response/bounce pair converted by [folmeSpring] (`dampingRatio = 1 - bounce`,
++     * `stiffness` from `39.47 / response²`, which is `(2π / response)²`).
+      *
+      * Geometry and the six spring pairs come from `PopupGravityMotionParams`; the trajectory they
+      * feed is built by [BezierGravityPathMath].
+@@ -1197,10 +1198,12 @@ object ListPopupDefaults {
+ 
+     /**
+      * Path-parameter enter spring, driving the Bezier trajectory's `t` from 0 to 1
+-     * (COUI `PopupGravityMotionParams.openPathSpring`, response 0.29 / bounce 0.13).
++     * (COUI `PopupGravityMotionParams.openPathSpring`, response 0.29 / bounce 0.13). AnimateKit's
++     * `SpringValueCalculator` turns a bounce into `dampingRatio = 1 - bounce`, so 0.87 — not the
++     * `1 - bounce / 2` this used to take, which halved the menu's overshoot.
+      */
+     val PathEnterAnimationSpec =
+-        folmeSpring<Float>(damping = 0.935f, response = 0.29f, visibilityThreshold = 0.001f)
++        folmeSpring<Float>(damping = 0.87f, response = 0.29f, visibilityThreshold = 0.001f)
+ 
+     /**
+      * Path-parameter exit spring, driving the Bezier trajectory's `t` back to 0
+@@ -1211,10 +1214,10 @@ object ListPopupDefaults {
+ 
+     /**
+      * Scale enter spring (COUI `PopupGravityMotionParams.openScaleSpring`, response 0.40 /
+-     * bounce 0.20).
++     * bounce 0.20, i.e. `dampingRatio = 1 - bounce = 0.8`).
+      */
+     val FractionAnimationSpec =
+-        folmeSpring<Float>(damping = 0.9f, response = 0.4f, visibilityThreshold = 0.001f)
++        folmeSpring<Float>(damping = 0.8f, response = 0.4f, visibilityThreshold = 0.001f)
+ 
+     /**
+      * Scale exit spring (COUI `PopupGravityMotionParams.closeScaleSpring`, response 0.21 /
+@@ -1503,6 +1506,23 @@ internal fun Modifier.popupStaticBackdrop(
+     }
+ }
+ 
++/**
++ * [popupGlassBlendColors] painted over a captured page: the mix colour as a luminosity layer, then
++ * the blend colour as an overlay layer, each weighted by its own alpha — the colour adjustments libhwui
++ * applies to the live popup blur, here on a static image.
++ */
++internal fun Modifier.popupSnapshotTint(isDark: Boolean, shape: Shape): Modifier = drawWithCache {
++    val silhouette = Path().apply { addOutline(shape.createOutline(size, layoutDirection, this@drawWithCache)) }
++    val mix = if (isDark) PopupMixBlurDark else PopupMixBlurLight
++    val blend = if (isDark) PopupBlendBlurDark else PopupBlendBlurLight
++    onDrawBehind {
++        clipPath(silhouette) {
++            drawRect(color = mix, blendMode = BlendMode.Luminosity)
++            drawRect(color = blend, blendMode = BlendMode.Overlay)
++        }
++    }
++}
++
+ /**
+  * The popup silhouette: the 28dp superellipse (n ≈ 2.5) COUI draws for panels, kept on the
+  * superellipse all the way to the capsule ends. A single 56dp row is exactly twice the radius, so
+@@ -2139,7 +2159,8 @@ fun ListPopupContent(
+                 // A closing panel keeps shrinking into its anchor; a drag that lands on it while it
+                 // does belongs to the page beneath, so the disabled card must not catch the touch.
+                 hitTestWhenDisabled = false,
+-                lightEnabled = glassBackdrop != null,
++                // The captured-page glass is the same material, so it keeps the press light too.
++                lightEnabled = glassBackdrop != null || snapshotBackdrop != null,
+                 shape = glassShape,
+                 lightParams = SpotLightDefaults.translucentLarge1(isDark),
+                 surface = Modifier
+@@ -2159,9 +2180,17 @@ fun ListPopupContent(
+                                 originInWindow = panelOriginInWindow,
+                                 shape = glassShape,
+                             )
+-                            .background(
+-                                color = backgroundColor.copy(alpha = surfaceAlpha),
+-                                shape = glassShape,
++                            .then(
++                                if (snapshotBackdrop != null) {
++                                    // The live glass's tint pair, laid on the captured page instead of
++                                    // one flat 60% fill (that read milky in light, grey in dark).
++                                    Modifier.popupSnapshotTint(isDark, glassShape)
++                                } else {
++                                    Modifier.background(
++                                        color = backgroundColor.copy(alpha = surfaceAlpha),
++                                        shape = glassShape,
++                                    )
++                                },
+                             ),
+                         blurRadius = blurRadius,
+                         blendColors = popupGlassBlendColors(),
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt
+@@ -431,7 +431,7 @@ data class MaterialStrokeParams(
+             edgeAlpha = 0.3f,
+             edgeWidth = 2.5.dp,
+             edgeAngle = 0f,
+-            shadowFadeIn = 0.1f,
++            shadowFadeIn = 0.04f,
+             shadowFadeOut = 0f,
+             shadowFadeScale = 1f,
+         )
+@@ -441,7 +441,7 @@ data class MaterialStrokeParams(
+             edgeAlpha = 0.25f,
+             edgeWidth = 2.5.dp,
+             edgeAngle = 0f,
+-            shadowFadeIn = 0.1f,
++            shadowFadeIn = 0.06f,
+             shadowFadeOut = 0f,
+             shadowFadeScale = 1f,
+         )
+@@ -449,6 +449,26 @@ data class MaterialStrokeParams(
+         /** Resolves `TYPE_CONTENT_CAPSULE_4` by night mode, as `getStrokeParamsByType` does. */
+         fun contentCapsule4(isDark: Boolean): MaterialStrokeParams = if (isDark) ContentCapsule4Dark else ContentCapsule4
+ 
++        /**
++         * `TYPE_CONTENT_CAPSULE_1` — the rim `COUIButton` asks the system material for on a filled
++         * accent (`ButtonType.PRIMARY`) button. Unlike [ContentCapsule4] (the drawable-material
++         * fallback) it has a full inward fade (fadeOut 1); the dark variant narrows it to 0.8.
++         */
++        fun contentCapsule1(isDark: Boolean, enabled: Boolean = true): MaterialStrokeParams = when {
++            enabled && !isDark -> MaterialStrokeParams(0.4f, 2.8.dp, 0f, 0.1f, 1f, 1f)
++            enabled -> MaterialStrokeParams(0.6f, 2.8.dp, 0f, 0.08f, 1f, 0.8f)
++            !isDark -> MaterialStrokeParams(0.12f, 2.8.dp, 0f, 0.03f, 0.3f, 1f)
++            else -> MaterialStrokeParams(0.18f, 2.8.dp, 0f, 0.024f, 0.3f, 0.8f)
++        }
++
++        /** `TYPE_CONTENT_CAPSULE_2` — the system-material rim of a secondary (grey) `COUIButton`. */
++        fun contentCapsule2(isDark: Boolean, enabled: Boolean = true): MaterialStrokeParams = when {
++            enabled && !isDark -> MaterialStrokeParams(0.5f, 2.8.dp, 0f, 0.1f, 1f, 1f)
++            enabled -> MaterialStrokeParams(0.5f, 2.8.dp, 0f, 0.05f, 1f, 1f)
++            !isDark -> MaterialStrokeParams(0.15f, 2.8.dp, 0f, 0.03f, 0.3f, 1f)
++            else -> MaterialStrokeParams(0.15f, 2.8.dp, 0f, 0.015f, 0.3f, 1f)
++        }
++
+         /** Resolves `TYPE_FRAMEWORK_CAPSULE_1` by night mode, as `getStrokeParamsByType` does. */
+         fun frameworkCapsule1(isDark: Boolean): MaterialStrokeParams = if (isDark) FrameworkCapsule1Dark else FrameworkCapsule1Light
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SpotLightEffect.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SpotLightEffect.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SpotLightEffect.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SpotLightEffect.kt
+@@ -177,7 +177,7 @@ object SpotLightDefaults {
+     val OpaqueMedium1Light: SpotLightParams = SpotLightParams(
+         blendMode = BlendMode.Overlay,
+         startIntensity = 0f,
+-        endIntensity = 0.6f,
++        endIntensity = 0.8f,
+         startRadius = 100f,
+         endRadius = 500f,
+         lightHeight = 200f,
+@@ -208,6 +208,17 @@ object SpotLightDefaults {
+         endIntensity = 0.15f,
+     )
+ 
++    /**
++     * `COUISpotLightEffect.TYPE_OPAQUE_SMALL_2` — the press light of a round glass title-bar / toolbar
++     * key (`ToolbarMaterialEffectDelegate`): [OpaqueMedium2Light]'s light at the same 500 radius.
++     */
++    val OpaqueSmall2Light: SpotLightParams = OpaqueMedium2Light
++    val OpaqueSmall2Dark: SpotLightParams = OpaqueMedium2Dark
++
++    /** `COUISpotLightEffect.TYPE_TRANSPARENT_MEDIUM_1` — a borderless / transparent `COUIButton`. */
++    val TransparentMedium1Light: SpotLightParams = OpaqueMedium2Light.copy(endIntensity = 0.5f)
++    val TransparentMedium1Dark: SpotLightParams = OpaqueMedium2Light.copy(endIntensity = 0.3f)
++
+     /**
+      * `COUISpotLightEffect.TYPE_OPAQUE_SMALL_1_LIGHT` — the light `FloatingButtonWrapper` puts on
+      * the floating action button.
+@@ -379,6 +390,10 @@ object SpotLightDefaults {
+ 
+     fun opaqueMedium2(isDark: Boolean): SpotLightParams = if (isDark) OpaqueMedium2Dark else OpaqueMedium2Light
+ 
++    fun opaqueSmall2(isDark: Boolean): SpotLightParams = if (isDark) OpaqueSmall2Dark else OpaqueSmall2Light
++
++    fun transparentMedium1(isDark: Boolean): SpotLightParams = if (isDark) TransparentMedium1Dark else TransparentMedium1Light
++
+     /** Resolves `CIRCLE_PARAMS_1_LIGHT` / `_DARK` by night mode. */
+     fun circleParams1(isDark: Boolean): SpotLightParams = if (isDark) CircleParams1Dark else CircleParams1Light
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Switch.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Switch.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Switch.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Switch.kt
+@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.StrokeCap
+ import androidx.compose.ui.graphics.drawOutline
++import androidx.compose.ui.graphics.luminance
+ import androidx.compose.ui.graphics.drawscope.Stroke
+ import androidx.compose.ui.graphics.drawscope.rotate
+ import androidx.compose.ui.graphics.drawscope.scale
+@@ -106,6 +107,7 @@ fun Switch(
+     val isHovered by interactionSource.collectIsHoveredAsState()
+ 
+     val couiHaptic = rememberCouiHaptic()
++    val clickSound = io.github.suqi8.coui.kmp.utils.rememberCouiClickSound()
+ 
+     val squircleEnabled = isSquircleEnabled()
+     val capsuleShape = remember(squircleEnabled) {
+@@ -143,15 +145,16 @@ fun Switch(
+         animationSpec = tween(durationMillis = 450, easing = couiToggleEasing),
+     )
+ 
+-    // COUI press/hover feedback: translucent overlay over the bar color (coui_color_press / coui_color_hover).
+-    // COUISwitch.configStateEffectAnimator drives both with spring(response 0.3, bounce 0).
+-    val overlayTone = COUITheme.colorScheme.onSurface
++    // COUI press/hover feedback: translucent overlay over the bar color (coui_color_press / coui_color_hover:
++    // #1F000000 / #14000000 light, #33FFFFFF / #26FFFFFF dark). COUISwitch.configStateEffectAnimator
++    // drives both with spring(response 0.3, bounce 0).
++    val overlayDark = COUITheme.colorScheme.background.luminance() < 0.5f
+     val overlaySpring = remember { folmeSpring<Color>(damping = 1f, response = 0.3f) }
+     val pressOverlayState = animateColorAsState(
+         when {
+             !enabled -> Color.Transparent
+-            isPressed -> overlayTone.copy(alpha = 0.12f)
+-            isHovered -> overlayTone.copy(alpha = 0.078f)
++            isPressed -> if (overlayDark) Color(0x33FFFFFF) else Color(0x1F000000)
++            isHovered -> if (overlayDark) Color(0x26FFFFFF) else Color(0x14000000)
+             else -> Color.Transparent
+         },
+         animationSpec = overlaySpring,
+@@ -180,6 +183,7 @@ fun Switch(
+     }
+ 
+     val currentCouiHaptic by rememberUpdatedState(couiHaptic)
++    val currentClickSound by rememberUpdatedState(clickSound)
+     // Loading switches cannot be toggled (COUISwitch loading style swallows touch).
+     val interactive = enabled && !isLoading
+     val hasCallback = onCheckedChange != null
+@@ -187,6 +191,9 @@ fun Switch(
+         { value ->
+             currentOnCheckedChange?.invoke(value)
+             currentCouiHaptic(CouiHapticEffect.Switch)
++            // COUISwitch plays coui_switch_sound_on/off when touch sounds are on; the system click
++            // stands in for those (the platform skips it when the setting is off).
++            currentClickSound()
+         }
+     }
+     val currentChecked by rememberUpdatedState(checked)
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarButtonDefaults.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarButtonDefaults.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarButtonDefaults.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarButtonDefaults.kt
+@@ -50,7 +50,11 @@ internal object CouiTopAppBarButtonDefaults {
+             dark,
+             circleShape,
+             CouiCapsuleShape,
+-            material = { capsule -> material(dark, capsule, search).copy(blurRadius = blurRadius) },
++            // Keys take the SDK's TOP_BAR material (ToolbarMaterialEffectResolver) as it is; only the
++            // search field keeps the darkened variant tuned for text on top of it.
++            material = { capsule ->
++                (if (search) material(dark, capsule, search) else systemMaterial(dark, capsule)).copy(blurRadius = blurRadius)
++            },
+             shadow = { capsule -> shadow(dark, capsule, density, contour, search) },
+             contentColor = LocalCouiToolbarContentColor.current.takeOrElse { colors.onSurface },
+             textStyle = CouiTheme.typography.body,
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
+@@ -705,20 +705,24 @@ object DialogDefaults {
+      * `coui_dialog_list_mix_blur_light` (`#DC909090`), handed to `OplusBlurParam.setMaterialParams`.
+      * That platform shader weighs them as material params, not as `SrcOver` layers — stacked with
+      * `SrcOver` the two greys could never come out lighter than 160, yet the live panel is (228,228,228).
+-     * So the layer here is fitted to the measured output instead: a neutral grey at the same 86%
+-     * weight as the native mix, which lands on 228 over a light page and lets the blurred page tint
+-     * the remaining 14%.
++     * So the layer here is fitted to the output rather than stacked: a neutral grey at the blend
++     * colour's weight.
++     *
++     * The COUI SDK of ColorOS 17 apps (`COUIAlertDialogBuilder`) moved the light pair to blend
++     * `#CCEEEEEE` / mix `#99CDCDCD`; refitted the same way that is `#EEEEEE` at 80%, which lands on
++     * ~238 over a light page (the earlier `#DCE7E7E7` fit of the older pair landed on 228) and lets
++     * the blurred page tint the remaining 20%.
+      */
+     val BlurColorsLight: List<BlendColorEntry> = listOf(
+-        BlendColorEntry(color = Color(0xDCE7E7E7)),
++        BlendColorEntry(color = Color(0xCCEEEEEE)),
+     )
+ 
+     /**
+      * The tint of the dark dialog over its blur: the native recipe itself, not a fit.
+      *
+      * In night mode `COUIBackgroundBlurBuilder` hands `OplusBlurParam.setMaterialParams` mode 2 with
+-     * `coui_dialog_list_blend_blur_dark` (`#B2292929`) and `coui_dialog_list_mix_blur_dark`
+-     * (`#8C777777`). BlurService's composite shader (`librenderkit.so`, `bgBlend`) reads mode 2 as
++     * the blend and mix colours; the ColorOS 17 SDK (`COUIAlertDialogBuilder`) uses blend `#99262626`
++     * and mix `#665E5E5E` (an older SDK used `#B2292929` / `#8C777777`). BlurService's composite shader (`librenderkit.so`, `bgBlend`) reads mode 2 as
+      * "luminosity + dodge": the blur takes the blend colour's luminance at its alpha, keeping its own
+      * hue and saturation, then the mix colour dodges it at its alpha. Both steps are standard blend
+      * modes, so the layers reproduce it exactly. Over a black page it lands on (42,42,42) against the
+@@ -726,8 +730,8 @@ object DialogDefaults {
+      * the panel — the translucency a flat grey layer erased.
+      */
+     val BlurColorsDark: List<BlendColorEntry> = listOf(
+-        BlendColorEntry(color = Color(0xB2292929), mode = BlurBlendMode.Luminosity),
+-        BlendColorEntry(color = Color(0x8C777777), mode = BlurBlendMode.ColorDodge),
++        BlendColorEntry(color = Color(0x99262626), mode = BlurBlendMode.Luminosity),
++        BlendColorEntry(color = Color(0x665E5E5E), mode = BlurBlendMode.ColorDodge),
+     )
+ 
+     /**
+@@ -775,7 +779,7 @@ object DialogDefaults {
+      *
+      * ColorOS 17 draws the rim from `COUIShadowEdgeDrawable` fed by
+      * `DialogShadowEdgeParamsExtKt.dialogShadowEdgeParamsDefault`, i.e. a 4dp / 0.6 alpha rim with
+-     * a 0.4 inner-shadow fade in light mode and 2dp / 0.3 with 0.03 in dark mode. The panel uses
++     * a 0.6 inner-shadow fade in light mode and 2dp / 0.3 with 0.03 in dark mode. The panel uses
+      * the `EDGE_STYLE_2` "large panel" preset, which is the same gradient the dialog root layout
+      * installs.
+      */
+@@ -790,7 +794,7 @@ object DialogDefaults {
+         MaterialStrokeParams(
+             edgeAlpha = 0.6f,
+             edgeWidth = 4.dp,
+-            shadowFadeIn = 0.4f,
++            shadowFadeIn = 0.6f,
+         )
+     }
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/COUIIndication.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/COUIIndication.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/COUIIndication.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/COUIIndication.kt
+@@ -34,6 +34,9 @@ private const val HOVER_ALPHA_DARK = 0x26 / 255f
+ private const val PRESS_ALPHA_LIGHT = 0x1F / 255f
+ private const val PRESS_ALPHA_DARK = 0x33 / 255f
+ 
++/** COUIMaskEffectDrawable: a press mask fades only after reaching this share of its full alpha. */
++private const val PRESS_MIN_VISIBLE_PROGRESS = 0.7f
++
+ // COUIStrokeDrawable strokes `default_focus_stroke_radius` (3dp) on both sides of the edge.
+ private val FocusStrokeWidth = 6.dp
+ 
+@@ -125,6 +128,12 @@ class COUIIndication(
+                             // otherwise keep the layer at full strength long after the finger is
+                             // up, and a picture taken of the page would freeze it there.
+                             pressedAnimation?.cancel()
++                            // COUIMaskEffectDrawable: a release before the press layer reached 70%
++                            // first lets it reach 70%, then fades — so a quick tap still flashes.
++                            val floor = pressAlpha * PRESS_MIN_VISIBLE_PROGRESS
++                            if (animatedAlpha.value > 0f && animatedAlpha.value < floor) {
++                                animatedAlpha.animateTo(targetValue = floor, animationSpec = StateLayerSpring)
++                            }
+                             animatedAlpha.animateTo(
+                                 targetValue = targetAlpha,
+                                 animationSpec = StateLayerSpring,
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiHapticEffect.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiHapticEffect.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiHapticEffect.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/CouiHapticEffect.kt
+@@ -70,3 +70,10 @@ internal fun CouiHapticEffect.toStandardHaptic(): HapticFeedbackType = when (thi
+     CouiHapticEffect.EdgeList -> HapticFeedbackType.GestureThresholdActivate
+     CouiHapticEffect.EdgeSqueeze -> HapticFeedbackType.LongPress
+ }
++
++/**
++ * The system click sound a COUI control plays on a state change (`COUISwitch` toggling, through
++ * `View.playSoundEffect`). The platform only plays it when the user's "touch sounds" setting is on.
++ */
++@Composable
++expect fun rememberCouiClickSound(): () -> Unit

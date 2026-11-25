@@ -25,6 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Upstream sources match UPSTREAM_SHA + patches
+        run: |
+          git clone --quiet --filter=blob:none --no-checkout https://github.com/Costben/coui17 "$RUNNER_TEMP/upstream"
+          python3 -I tools/check_patches.py --repo "$RUNNER_TEMP/upstream"
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:

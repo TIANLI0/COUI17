@@ -73,8 +73,51 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
 - **Here:** a public `LocalTopAppBarTitleMarquee` composition local (default `false`). When true,
   title and subtitle use `basicMarquee`; text that fits does not move. `COUI17Theme` turns it on.
 
-All four are small, additive and off by default where they add behaviour, so they are candidates to
-send upstream; once upstream has one, delete its patch file.
+### 0005 — bottom bar capsule inner fade
+
+- **Files:** `coui-ui/src/commonMain/…/basic/BottomFloatingNavigationBar.kt`, `…/basic/MaterialShadowEdge.kt`
+- **Upstream:** the Compose glass of the floating bottom bar draws the rim line of
+  `TYPE_FRAMEWORK_CAPSULE_3` only, and the expansion view fades on the bouncing geometry progress.
+- **Here:** the inward fade of the system material (fade-in 0.1 light / 0.03 dark) is drawn under
+  the icons (`materialInnerGlow(behindContent)`), and the expansion view fades on its own spring
+  (response 0.35, no bounce).
+
+### 0006 — alignment with the ColorOS 17 COUI SDK
+
+- **Files:** `basic/Button.kt`, `basic/HighlightedIconButton.kt`, `basic/COUITouchMotion.kt`,
+  `basic/ListPopup.kt`, `basic/MaterialShadowEdge.kt`, `basic/SpotLightEffect.kt`, `basic/Switch.kt`,
+  `kit/topappbar/CouiTopAppBarButtonDefaults.kt`, `layout/DialogContentLayout.kt`,
+  `utils/COUIIndication.kt`, `utils/CouiHapticEffect.kt` and a new
+  `androidMain/…/utils/CouiClickSound.android.kt`.
+- **Here:** button rims and press lights by material type, the touch-motion springs, popup enter
+  damping and its captured-page tint, the dialog tint, a quick tap's indication reaching 70 %, the
+  switch's dark press colours and system click sound — measured against the COUI SDK. The dark page
+  stays `#303030` (upstream's value), not the SDK's `#000000`.
+
+### 0007 — expand arrow duration
+
+- **File:** `coui-ui/src/commonMain/…/basic/ExpandArrow.kt`
+- **Here:** `ExpandArrow` takes `durationMillis` (default unchanged), so `coui-patterns`' 300ms
+  expand motion turns the arrow in the same time.
+
+### 0008 — live host-window backdrop for window dialogs and sheets
+
+- **Files:** `coui-blur/src/commonMain/…/blur/ImageBackdrop.kt`,
+  `coui-ui/src/{commonMain,androidMain}/…/utils/HostWindowBackdrop*.kt`
+- **Upstream:** a `Window*` dialog or sheet captures the host window once when it opens and frosts
+  that still.
+- **Here:** the host is captured again after each of its draws (at most every 33 ms, one copy in
+  flight, three reused bitmaps); `ImageBackdrop` holds the capture as state read while drawing, so
+  only the consumers redraw. A host that does not draw is not copied again.
+
+0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
+to send upstream; once upstream has one, delete its patch file.
+
+**Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
+wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
+rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on
+every push, and the sync workflow runs it before it syncs. To record a change, commit it, then
+append `git diff <before> <after> -- <upstream paths>` as the next numbered patch.
 
 ## Staying in step: automatic sync
 
@@ -106,6 +149,7 @@ run; the sync job has already built and tested exactly that tree.
 
 ```bash
 git clone https://github.com/Costben/coui17 ../coui17-upstream
+python -I tools/check_patches.py --repo ../coui17-upstream   # nothing local is left out of patches/
 python -I tools/sync_upstream.py --repo ../coui17-upstream --sha <full-40-char-sha>
 git add -A
 python -I tools/upstream_review.py --upstream ../coui17-upstream --old <previous-sha> --new <full-sha>

@@ -1,0 +1,183 @@
+diff --git a/coui-blur/src/commonMain/kotlin/io/github/suqi8/coui/kmp/blur/ImageBackdrop.kt b/coui-blur/src/commonMain/kotlin/io/github/suqi8/coui/kmp/blur/ImageBackdrop.kt
+--- a/coui-blur/src/commonMain/kotlin/io/github/suqi8/coui/kmp/blur/ImageBackdrop.kt
++++ b/coui-blur/src/commonMain/kotlin/io/github/suqi8/coui/kmp/blur/ImageBackdrop.kt
+@@ -3,6 +3,9 @@
+ package io.github.suqi8.coui.kmp.blur
+ 
+ import androidx.compose.runtime.Stable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.graphics.FilterQuality
+ import androidx.compose.ui.graphics.GraphicsLayerScope
+@@ -22,8 +25,9 @@ import io.github.suqi8.coui.kmp.blur.internal.InverseLayerScope
+  *
+  * A surface hosted in its own platform window (a `Dialog`) cannot sample the page it opens over:
+  * that page is recorded in a different window, and a recorded layer cannot be read across windows.
+- * The host captures the page once instead and hands it over as this backdrop, so the surface runs
+- * the same blur and tint pipeline an in-window surface does, over a still of the same page.
++ * The host captures the page instead and hands it over as this backdrop, so the surface runs the
++ * same blur and tint pipeline an in-window surface does; the host re-captures whenever the page
++ * draws again and passes the new image to [update].
+  *
+  * Positions are matched on screen, because the consumer and the captured window live in different
+  * windows whose origins need not coincide.
+@@ -35,11 +39,30 @@ import io.github.suqi8.coui.kmp.blur.internal.InverseLayerScope
+ @InternalCouiBlurApi
+ @Stable
+ class ImageBackdrop(
+-    val image: ImageBitmap,
+-    val sourceSize: IntSize,
+-    val sourceOriginOnScreen: Offset,
++    image: ImageBitmap,
++    sourceSize: IntSize,
++    sourceOriginOnScreen: Offset,
+ ) : Backdrop {
+ 
++    /** The current capture. Read while drawing, so replacing it redraws the consumers only. */
++    var image: ImageBitmap by mutableStateOf(image)
++        private set
++    var sourceSize: IntSize by mutableStateOf(sourceSize)
++        private set
++    var sourceOriginOnScreen: Offset by mutableStateOf(sourceOriginOnScreen)
++        private set
++
++    /**
++     * Replaces the capture with a newer one of the same window (the host keeps sampling while the
++     * surface is open, so the frost follows what changes underneath: streaming text, a list that
++     * scrolls on its own). Consumers redraw; nothing recomposes.
++     */
++    fun update(image: ImageBitmap, sourceSize: IntSize, sourceOriginOnScreen: Offset) {
++        this.image = image
++        this.sourceSize = sourceSize
++        this.sourceOriginOnScreen = sourceOriginOnScreen
++    }
++
+     override val isCoordinatesDependent: Boolean = true
+ 
+     override var offsetResidualX: Float = 0f
+diff --git a/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.android.kt b/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.android.kt
+--- a/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.android.kt
++++ b/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.android.kt
+@@ -32,6 +32,19 @@ import io.github.suqi8.coui.kmp.blur.isBlurEnabled
+  */
+ private const val CAPTURE_DOWNSCALE = 4
+ 
++/** Shortest gap between two captures: a page that redraws every frame is sampled at about 30 fps. */
++private const val MIN_CAPTURE_INTERVAL_MS = 33L
++
++/** Captures rotate through this many bitmaps, so the one being written is never the one on screen. */
++private const val CAPTURE_BUFFERS = 3
++
++/**
++ * Captures the host window while [active] and keeps the capture current: the first copy is taken
++ * at once, then a new one whenever the host's view tree draws again (at most every
++ * [MIN_CAPTURE_INTERVAL_MS], one copy in flight), into a small ring of reused bitmaps. A page that
++ * does not change is not copied again, so an idle panel costs nothing; one that streams text or
++ * scrolls under the panel shows through it live instead of as the still taken when it opened.
++ */
+ @Composable
+ internal actual fun rememberHostWindowBackdrop(active: Boolean): State<Backdrop?> {
+     val state = remember { mutableStateOf<Backdrop?>(null) }
+@@ -43,35 +56,77 @@ internal actual fun rememberHostWindowBackdrop(active: Boolean): State<Backdrop?
+         var disposed = false
+         val window = if (capture) view.context.findActivity()?.window else null
+         val decor = window?.peekDecorView()
+-        if (window != null && decor != null && decor.width > 0 && decor.height > 0) {
++        val main = Handler(Looper.getMainLooper())
++        if (window == null || decor == null || decor.width <= 0 || decor.height <= 0) {
++            return@DisposableEffect onDispose { state.value = null }
++        }
++        val buffers = arrayOfNulls<Bitmap>(CAPTURE_BUFFERS)
++        var next = 0
++        var inFlight = false
++        var pending = false
++        var lastAt = 0L
++
++        fun bufferFor(w: Int, h: Int): Bitmap {
++            val b = buffers[next]
++            val bmp = if (b != null && b.width == w && b.height == h) b else Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also { buffers[next] = it }
++            next = (next + 1) % CAPTURE_BUFFERS
++            return bmp
++        }
++
++        lateinit var request: () -> Unit
++        val runRequest = Runnable { request() }
++        request = request@{
++            if (disposed || inFlight) return@request
++            if (decor.width <= 0 || decor.height <= 0) return@request
++            val now = android.os.SystemClock.uptimeMillis()
++            val wait = lastAt + MIN_CAPTURE_INTERVAL_MS - now
++            if (wait > 0) {
++                if (!pending) {
++                    pending = true
++                    main.postDelayed({ pending = false; request() }, wait)
++                }
++                return@request
++            }
+             val sourceSize = IntSize(decor.width, decor.height)
+             val origin = IntArray(2).also(decor::getLocationOnScreen)
+-            val bitmap = Bitmap.createBitmap(
++            val bitmap = bufferFor(
+                 (sourceSize.width / CAPTURE_DOWNSCALE).coerceAtLeast(1),
+                 (sourceSize.height / CAPTURE_DOWNSCALE).coerceAtLeast(1),
+-                Bitmap.Config.ARGB_8888,
+             )
++            inFlight = true
++            lastAt = now
+             try {
+                 PixelCopy.request(
+                     window,
+                     bitmap,
+                     { result ->
++                        inFlight = false
+                         if (!disposed && result == PixelCopy.SUCCESS) {
+-                            state.value = ImageBackdrop(
+-                                image = bitmap.asImageBitmap(),
+-                                sourceSize = sourceSize,
+-                                sourceOriginOnScreen = Offset(origin[0].toFloat(), origin[1].toFloat()),
+-                            )
++                            val originOffset = Offset(origin[0].toFloat(), origin[1].toFloat())
++                            when (val current = state.value) {
++                                is ImageBackdrop -> current.update(bitmap.asImageBitmap(), sourceSize, originOffset)
++                                else -> state.value = ImageBackdrop(bitmap.asImageBitmap(), sourceSize, originOffset)
++                            }
+                         }
+                     },
+-                    Handler(Looper.getMainLooper()),
++                    main,
+                 )
+             } catch (_: IllegalArgumentException) {
+                 // The window has no surface yet; the panel keeps the inherited backdrop.
++                inFlight = false
+             }
+         }
++        // The host drew a new frame: sample it (coalesced and rate-limited above). Posted, because
++        // a copy must not be requested from inside the host's own draw pass.
++        val onDraw = android.view.ViewTreeObserver.OnDrawListener { if (!disposed) main.post(runRequest) }
++        val observer = decor.viewTreeObserver
++        observer.addOnDrawListener(onDraw)
++        request()
+         onDispose {
+             disposed = true
++            main.removeCallbacks(runRequest)
++            // An OnDrawListener cannot be removed while the tree dispatches it.
++            main.post { runCatching { if (decor.viewTreeObserver.isAlive) decor.viewTreeObserver.removeOnDrawListener(onDraw) } }
+             state.value = null
+         }
+     }
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/HostWindowBackdrop.kt
+@@ -13,8 +13,8 @@ import io.github.suqi8.coui.kmp.blur.LocalBackdrop
+  * own.
+  *
+  * A `Dialog` window has no page underneath it to sample, so a glass panel inside it would frost
+- * nothing and show only its tint. While [active], this captures the host window once and exposes it
+- * as a backdrop; [ProvideHostWindowBackdrop] then hands it to the dialog's content, which runs the
++ * nothing and show only its tint. While [active], this captures the host window, again whenever it
++ * draws (rate-limited), and exposes it as a backdrop; [ProvideHostWindowBackdrop] then hands it to the dialog's content, which runs the
+  * same blur and tint as an in-window panel. Must be called in the host composition, outside the
+  * `Dialog`, so it captures the page rather than the dialog.
+  *

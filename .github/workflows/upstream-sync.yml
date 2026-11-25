@@ -84,6 +84,12 @@ jobs:
             } | tee "$RUNNER_TEMP/upstream-log.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # A change made to the upstream-owned sources without a patch would be reverted by the sync
+      # below and pushed to main with nobody noticing. Stop instead.
+      - name: Check that every local change to upstream sources is a patch
+        if: steps.upstream.outputs.changed == 'true'
+        run: python3 -I tools/check_patches.py --repo "$RUNNER_TEMP/upstream"
+
       - name: Apply upstream sources and this repository's patches
         id: apply
         if: steps.upstream.outputs.changed == 'true'
