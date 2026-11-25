@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.geometry.translate
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.DisposableEffect
@@ -110,28 +112,65 @@ private fun glassLayers(dark: Boolean, tint: Color?): List<BlendColorEntry> {
 @Stable
 class GlassGroupState internal constructor() {
     internal val parts = mutableStateMapOf<Any, Outline>()
+
+    /** What each member's outline was built from: a member that did not move is not rebuilt. */
+    private val placed = HashMap<Any, MemberGeometry>()
     internal var origin: LayoutCoordinates? = null
+
+    /**
+     * The union of the members' outlines. The group's blur asks for its shape on every draw (every
+     * frame while the page under it streams); this is one instance until a member's outline
+     * changes, so the blur's outline cache holds instead of rebuilding a path per draw.
+     */
+    internal val union: Shape by derivedStateOf { UnionShape(parts.values.toList()) }
+
+    /**
+     * Records the outline of the member [key]: [shape] at [size], placed at [offset] in the group.
+     * Nothing is written when the geometry is unchanged: positioning callbacks run on every layout
+     * pass (an IME animation moves the whole row each frame), and an outline built from a path has
+     * no value equality, so comparing outlines would rewrite the map, and redraw, every time.
+     */
+    internal fun place(key: Any, shape: Shape, offset: Offset, size: Size, layoutDirection: LayoutDirection, density: Density) {
+        val geometry = MemberGeometry(shape, offset, size, layoutDirection, density.density, density.fontScale)
+        if (placed[key] == geometry) return
+        placed[key] = geometry
+        parts[key] = shape.createOutline(size, layoutDirection, density).translated(offset)
+    }
+
+    internal fun remove(key: Any) {
+        placed.remove(key)
+        parts.remove(key)
+    }
 
     /** Registers the outline of the node it is put on; removed when the node leaves. */
     @Composable
     internal fun member(shape: Shape): Modifier {
         val key = remember { Any() }
-        DisposableEffect(key) { onDispose { parts.remove(key) } }
+        DisposableEffect(key) { onDispose { remove(key) } }
         val layoutDirection = LocalLayoutDirection.current
         val density = LocalDensity.current
         return Modifier.onGloballyPositioned { coords ->
             val group = origin ?: return@onGloballyPositioned
             if (!coords.isAttached || !group.isAttached) return@onGloballyPositioned
             val offset = group.localPositionOf(coords, Offset.Zero)
-            val size = Size(coords.size.width.toFloat(), coords.size.height.toFloat())
-            val outline = when (val o = shape.createOutline(size, layoutDirection, density)) {
-                is Outline.Rectangle -> Outline.Rectangle(o.rect.translate(offset))
-                is Outline.Rounded -> Outline.Rounded(o.roundRect.translate(offset))
-                is Outline.Generic -> Outline.Generic(Path().apply { addPath(o.path, offset) })
-            }
-            if (parts[key] != outline) parts[key] = outline
+            place(key, shape, offset, Size(coords.size.width.toFloat(), coords.size.height.toFloat()), layoutDirection, density)
         }
     }
+}
+
+private data class MemberGeometry(
+    val shape: Shape,
+    val offset: Offset,
+    val size: Size,
+    val layoutDirection: LayoutDirection,
+    val density: Float,
+    val fontScale: Float,
+)
+
+internal fun Outline.translated(offset: Offset): Outline = when (this) {
+    is Outline.Rectangle -> Outline.Rectangle(rect.translate(offset))
+    is Outline.Rounded -> Outline.Rounded(roundRect.translate(offset))
+    is Outline.Generic -> Outline.Generic(Path().apply { addPath(path, offset) })
 }
 
 val LocalGlassGroup = staticCompositionLocalOf<GlassGroupState?> { null }
@@ -158,7 +197,7 @@ fun GlassGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
                 .matchParentSize()
                 .couiGlassSurface(
                     backdrop = LocalGlassBackdrop.current,
-                    shape = { UnionShape(state.parts.values.toList()) },
+                    shape = { state.union },
                     containerColor = fill,
                     fallback = Modifier,
                     blurRadius = GLASS_BLUR_RADIUS,
@@ -170,7 +209,7 @@ fun GlassGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 }
 
 /** The union of a group's member outlines (already in the group's coordinates). */
-private data class UnionShape(val outlines: List<Outline>) : Shape {
+internal data class UnionShape(val outlines: List<Outline>) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val path = Path()
         outlines.forEach { path.addOutline(it) }
