@@ -101,9 +101,9 @@ class MainActivity : ComponentActivity() {
 ## 构建与检查
 
 ```bash
-./gradlew :coui-patterns:testDebugUnitTest   # 单元测试
-./gradlew publishToMavenLocal                # 所有库模块
-./gradlew :gallery:assembleDebug             # 演示应用
+./gradlew :coui-patterns:testDebugUnitTest :coui-ui:testAndroidHostTest   # 单元测试
+./gradlew publishToMavenLocal                                              # 所有库模块
+./gradlew :gallery:assembleDebug                                           # 演示应用
 ```
 
 需要 Android SDK 平台 `android-37.2` 和 build-tools `37.0.0`，在 `local.properties` 里写 `sdk.dir=…`（或设置 `ANDROID_HOME`）。

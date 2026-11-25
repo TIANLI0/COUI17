@@ -155,7 +155,7 @@ python -I tools/check_patches.py --repo ../coui17-upstream   # nothing local is 
 python -I tools/sync_upstream.py --repo ../coui17-upstream --sha <full-40-char-sha>
 git add -A
 python -I tools/upstream_review.py --upstream ../coui17-upstream --old <previous-sha> --new <full-sha>
-./gradlew :coui-patterns:testDebugUnitTest publishToMavenLocal :gallery:assembleDebug
+./gradlew :coui-patterns:testDebugUnitTest :coui-ui:testAndroidHostTest publishToMavenLocal :gallery:assembleDebug
 python -I tools/gen_component_catalog.py
 ```
 

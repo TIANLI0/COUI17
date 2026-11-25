@@ -161,7 +161,7 @@ jobs:
         if: steps.upstream.outputs.changed == 'true'
         run: |
           set -uo pipefail
-          if ./gradlew --no-daemon :coui-patterns:testDebugUnitTest publishToMavenLocal :gallery:assembleDebug > "$RUNNER_TEMP/build.log" 2>&1; then
+          if ./gradlew --no-daemon :coui-patterns:testDebugUnitTest :coui-ui:testAndroidHostTest publishToMavenLocal :gallery:assembleDebug > "$RUNNER_TEMP/build.log" 2>&1; then
             echo "ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "ok=false" >> "$GITHUB_OUTPUT"

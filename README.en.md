@@ -83,7 +83,7 @@ The `gallery` module shows every component family on real ColorOS 17 pages, in l
 ## Build
 
 ```bash
-./gradlew :coui-patterns:testDebugUnitTest
+./gradlew :coui-patterns:testDebugUnitTest :coui-ui:testAndroidHostTest
 ./gradlew publishToMavenLocal
 ./gradlew :gallery:assembleDebug
 ```
