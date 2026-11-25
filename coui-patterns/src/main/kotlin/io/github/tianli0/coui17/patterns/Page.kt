@@ -26,14 +26,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.BindScrollToTop
@@ -259,21 +262,35 @@ fun Page(
     }
 }
 
-/** The back key of a detail page: the COUI17 glass round key of the top bar. */
+/**
+ * The back key of a detail page: the COUI17 glass round key of the top bar. The arrow points to
+ * the start edge, so it is mirrored in a right-to-left layout (coui's icons do not auto-mirror).
+ */
 @Composable
-fun BackArrow(onBack: () -> Unit) {
-    HighlightedIconButton(onClick = onBack, modifier = Modifier.couiTopAppBarActionItem()) {
-        Icon(imageVector = COUIIcons.Back, contentDescription = stringResource(R.string.coui17_action_back))
+fun BackArrow(onBack: () -> Unit, modifier: Modifier = Modifier) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    HighlightedIconButton(onClick = onBack, modifier = modifier.couiTopAppBarActionItem()) {
+        Icon(
+            imageVector = COUIIcons.Back,
+            contentDescription = stringResource(R.string.coui17_action_back),
+            modifier = if (rtl) Modifier.scale(scaleX = -1f, scaleY = 1f) else Modifier,
+        )
     }
 }
 
 /** A 40dp COUI17 round toolbar key with the standard action spacing, for a [Page]'s `actions`. */
 @Composable
-fun ToolbarIcon(icon: ImageVector, contentDescription: String, onClick: () -> Unit, enabled: Boolean = true) {
+fun ToolbarIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
     HighlightedIconButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.couiTopAppBarActionItem(),
+        modifier = modifier.couiTopAppBarActionItem(),
     ) {
         Icon(icon, contentDescription = contentDescription, tint = COUITheme.colorScheme.onSurface, modifier = Modifier.size(22.dp))
     }
