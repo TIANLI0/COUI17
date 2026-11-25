@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- Local changes to upstream sources are recorded as patches 0005–0008, and
+  `tools/check_patches.py` (run in CI and before each sync) fails when the upstream-owned sources
+  differ from `UPSTREAM_SHA` plus `patches/`. Before this, the next sync would have reverted
+  them.
+- Window dialogs and sheets re-sample the host window after it draws, and always end on the
+  host's last frame (`HostCaptureScheduler`).
+- `GlassGroup` keeps one union shape between member moves, and does not redraw on positioning
+  callbacks that change nothing.
+- `InputPill` no longer recomposes on each frame of its send-ready animation.
+- `BackArrow` mirrors in RTL. `BackArrow` and `ToolbarIcon` take a `modifier`. `COUI17Theme`
+  provides localized expand / collapse state words.
+- JVM host tests for `coui-ui` (`:coui-ui:testAndroidHostTest`).
+- Health-check report: `docs/health-check-2026-11.md`.
+
 ## 0.1.0
 
 First release as a standalone repository.
