@@ -145,6 +145,28 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
   consumed on the `Initial` pass). A drag nothing in the page wanted still engages anywhere on
   screen.
 
+### 0012 — scale visibility from COUI-Kit
+
+- **File (new):** `coui-ui/src/commonMain/…/kit/motion/CouiScaleVisibility.kt` (MPL-2.0)
+- **Upstream:** no shared show / hide for a floating control; each caller animates scale, alpha
+  and blur itself.
+- **Here:** `rememberCouiScaleVisibility(visible)` + `Modifier.couiScaleVisibility(state)`, ported
+  from COUI-Kit's `motion/CouiScaleVisibility.kt` (alpha21) onto the `kit` package's own
+  `CouiSpring`: scale 0.8 ↔ 1 (response 0.35 / bounce 0.35), alpha (0.2), and a 30px foreground
+  blur (0.3) only while `isBlurEnabled()`, so the system's blur switch and power saving turn it
+  off. `isPresent` keeps the control composed until every exit spring has settled. Upstream ports
+  COUI-Kit pieces into `kit` itself; drop this patch once it carries this one.
+
+### 0013 — compact bottom bar metrics
+
+- **File:** `coui-ui/src/commonMain/…/basic/BottomFloatingNavigationBar.kt`
+- **Upstream:** the capsule's item width (70dp), item gap (8dp) and end padding (12dp) are fixed
+  constants, so four tabs always take 328dp.
+- **Here:** `BottomFloatingNavigationBarMetrics` + `LocalBottomFloatingNavigationBarMetrics`;
+  `Native` (the default, unchanged) and `Compact` (62 / 4 / 10dp — the item width Clock measures
+  when its bar is squeezed, gaps scaled with it), read by `FloatingCapsuleRow` and the item's
+  width bound.
+
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.
 

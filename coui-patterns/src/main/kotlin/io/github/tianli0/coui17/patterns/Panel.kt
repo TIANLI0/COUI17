@@ -3,6 +3,15 @@
 
 package io.github.tianli0.coui17.patterns
 
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
+import io.github.suqi8.coui.kmp.layout.DialogDefaults
+import io.github.suqi8.coui.kmp.preference.RadioButtonPreference
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -233,6 +242,80 @@ fun FormDialog(
                 negative = DialogButtonBarAction(text = cancelText, onClick = onDismiss),
                 positive = DialogButtonBarAction(text = confirmText, enabled = confirmEnabled, onClick = onConfirm),
             )
+        }
+    }
+}
+
+/** One option of a [ChoiceDialog]. [value] identifies it and must be unique within the dialog. */
+data class ChoiceEntry<T>(
+    val value: T,
+    val text: String,
+    val summary: String? = null,
+    val enabled: Boolean = true,
+)
+
+/**
+ * The centred COUI17 single-choice dialog: the title stays put, an optional [message] and the
+ * options scroll together under it, and cancel stays at the bottom (COUI's single-choice alert:
+ * `setSingleChoiceItems` with the tail mark of `COUIMarkPreference`). Tapping an option selects it
+ * and closes the dialog, as the native one does; the current one carries the mark.
+ *
+ * For a choice that belongs on the page (a setting with a few values) list
+ * `RadioButtonPreference` rows in a [GroupCard] instead; this is for a choice asked in passing.
+ */
+@Composable
+fun <T> ChoiceDialog(
+    show: Boolean,
+    title: String,
+    entries: List<ChoiceEntry<T>>,
+    selected: T?,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    message: String? = null,
+    cancelText: String = stringResource(R.string.coui17_action_cancel),
+) {
+    require(entries.map { it.value }.toSet().size == entries.size) { "ChoiceDialog entries need unique values" }
+    WindowDialog(show = show, modifier = modifier, title = title, onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState())
+                    .selectableGroup(),
+            ) {
+                if (!message.isNullOrBlank()) {
+                    // COUI centres a one-line message and start-aligns it once it wraps.
+                    var wraps by remember { mutableStateOf(false) }
+                    Text(
+                        message,
+                        style = COUITheme.textStyles.footnote1,
+                        color = DialogDefaults.summaryColor(),
+                        textAlign = if (wraps) TextAlign.Start else TextAlign.Center,
+                        onTextLayout = { wraps = it.lineCount > 1 },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = DialogContentGutter).padding(bottom = 8.dp),
+                    )
+                }
+                CompositionLocalProvider(LocalOnPageColor provides false) {
+                    entries.forEach { entry ->
+                        RadioButtonPreference(
+                            title = entry.text,
+                            summary = entry.summary,
+                            selected = entry.value == selected,
+                            enabled = entry.enabled,
+                            insideMargin = PaddingValues(horizontal = DialogContentGutter, vertical = 14.dp),
+                            onClick = {
+                                if (show && entry.enabled) {
+                                    onSelect(entry.value)
+                                    onDismiss()
+                                }
+                            },
+                            modifier = Modifier.testTag("choice-${entries.indexOf(entry)}"),
+                        )
+                    }
+                }
+            }
+            DialogButtonBar(negative = DialogButtonBarAction(text = cancelText, onClick = onDismiss), positive = null)
         }
     }
 }

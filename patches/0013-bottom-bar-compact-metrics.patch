@@ -1,0 +1,61 @@
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt
+@@ -236,6 +236,34 @@ fun BottomFloatingNavigationBar(
+     )
+ }
+ 
++/**
++ * The three widths that size the capsule: an item's maximum width, the gap between items and the
++ * padding the capsule keeps at each end (see [FloatingCapsuleRow]).
++ *
++ * [Native] is the ColorOS 17 default (`coui_bottom_floating_navigation_bar_item_max_width` 70dp,
++ * `_item_space` 8dp, `_item_padding` 12dp). [Compact] is the tighter capsule native apps end up
++ * with when the bar is squeezed — Clock's items measure 62dp — with the gaps scaled down alongside
++ * so the proportions hold: 62dp items, 4dp apart, 10dp at each end.
++ */
++@Immutable
++data class BottomFloatingNavigationBarMetrics(
++    val itemMaxWidth: Dp,
++    val itemSpacing: Dp,
++    val innerPadding: Dp,
++) {
++    companion object {
++        val Native = BottomFloatingNavigationBarMetrics(
++            itemMaxWidth = BottomFloatingNavigationBarDefaults.ItemMaxWidth,
++            itemSpacing = BottomFloatingNavigationBarDefaults.ItemSpacing,
++            innerPadding = BottomFloatingNavigationBarDefaults.ItemInnerPadding,
++        )
++        val Compact = BottomFloatingNavigationBarMetrics(itemMaxWidth = 62.dp, itemSpacing = 4.dp, innerPadding = 10.dp)
++    }
++}
++
++/** The capsule widths for the bars below; [BottomFloatingNavigationBarMetrics.Native] by default. */
++val LocalBottomFloatingNavigationBarMetrics = staticCompositionLocalOf { BottomFloatingNavigationBarMetrics.Native }
++
+ /**
+  * The capsule's content row: the ColorOS 17 menu view layout, where every item gets an exact width.
+  *
+@@ -270,9 +298,10 @@ internal fun FloatingCapsuleRow(
+     content: @Composable RowScope.() -> Unit,
+ ) {
+     val density = LocalDensity.current
+-    val innerPaddingPx = with(density) { BottomFloatingNavigationBarDefaults.ItemInnerPadding.roundToPx() }
+-    val itemSpacePx = with(density) { BottomFloatingNavigationBarDefaults.ItemSpacing.roundToPx() }
+-    val itemMaxWidthPx = with(density) { BottomFloatingNavigationBarDefaults.ItemMaxWidth.roundToPx() }
++    val metrics = LocalBottomFloatingNavigationBarMetrics.current
++    val innerPaddingPx = with(density) { metrics.innerPadding.roundToPx() }
++    val itemSpacePx = with(density) { metrics.itemSpacing.roundToPx() }
++    val itemMaxWidthPx = with(density) { metrics.itemMaxWidth.roundToPx() }
+     val capsuleHeightPx = with(density) { BottomFloatingNavigationBarDefaults.BarHeight.roundToPx() }
+     val reservePx = with(density) { trailingReserve.roundToPx() }
+ 
+@@ -879,7 +908,7 @@ fun RowScope.BottomFloatingNavigationBarItem(
+     Box(
+         modifier = modifier
+             .height(BottomFloatingNavigationBarDefaults.ItemHeight)
+-            .widthIn(max = BottomFloatingNavigationBarDefaults.ItemMaxWidth)
++            .widthIn(max = LocalBottomFloatingNavigationBarMetrics.current.itemMaxWidth)
+             .then(itemTouchModifier)
+             .combinedClickable(
+                 interactionSource = interactionSource,

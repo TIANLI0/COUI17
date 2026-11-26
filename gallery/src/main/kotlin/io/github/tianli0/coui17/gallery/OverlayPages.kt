@@ -1,5 +1,10 @@
 package io.github.tianli0.coui17.gallery
 
+import androidx.compose.foundation.combinedClickable
+import io.github.suqi8.coui.kmp.basic.preciseClickAnchor
+import io.github.suqi8.coui.kmp.basic.rememberPreciseClickState
+import io.github.tianli0.coui17.patterns.ChoiceEntry
+import io.github.tianli0.coui17.patterns.ChoiceDialog
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -56,8 +61,13 @@ fun OverlaysPage() {
     var newName by rememberSaveable { mutableStateOf("") }
     val renamed = tr("已重命名", "Renamed")
     var rowMenu by rememberSaveable { mutableStateOf(false) }
+    var choice by rememberSaveable { mutableStateOf(false) }
+    var quality by rememberSaveable { mutableIntStateOf(1) }
+    var pressMenu by rememberSaveable { mutableStateOf(false) }
+    val touch = rememberPreciseClickState()
     var sort by rememberSaveable { mutableIntStateOf(0) }
     var last by rememberSaveable { mutableStateOf("") }
+    val qualities = listOf(tr("标准", "Standard"), tr("高", "High"), tr("超高", "Very high"), tr("原画（需要会员）", "Original (members)"))
     val sorts = listOf(tr("按名称", "By name"), tr("按时间", "By date"), tr("按大小", "By size"))
     val refreshed = tr("已刷新", "Refreshed")
     val allSelected = tr("已全选", "All selected")
@@ -91,14 +101,20 @@ fun OverlaysPage() {
                     ArrowPreference(
                         title = tr("确认对话框", "Confirmation"),
                         summary = tr("居中的标题、一段说明、取消 | 确认", "Centred title, one message, cancel | confirm"),
-                        cardListPosition = cardListPositionOf(0, 2),
+                        cardListPosition = cardListPositionOf(0, 3),
                         onClick = { confirm = true },
                     )
                     ArrowPreference(
                         title = tr("输入对话框", "Form dialog"),
                         summary = tr("问一个值：名称、行号、口令", "Asks for one value: a name, a line number"),
-                        cardListPosition = cardListPositionOf(1, 2),
+                        cardListPosition = cardListPositionOf(1, 3),
                         onClick = { rename = true },
+                    )
+                    ArrowPreference(
+                        title = tr("单选对话框", "Choice dialog"),
+                        summary = qualities[quality],
+                        cardListPosition = cardListPositionOf(2, 3),
+                        onClick = { choice = true },
                     )
                 }
             }
@@ -138,6 +154,24 @@ fun OverlaysPage() {
                     )
                 }
             }
+            item {
+                GroupCard(Modifier.preciseClickAnchor(touch)) {
+                    BasicComponent(
+                        title = tr("长按这一行", "Long-press this row"),
+                        summary = tr("菜单开在手指处，横向对准触点", "The menu opens at the finger, centred on it"),
+                        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = { pressMenu = true }),
+                    )
+                }
+                GlassMenu(
+                    show = pressMenu,
+                    onDismiss = { pressMenu = false },
+                    touch = touch,
+                    entries = listOf(
+                        MenuEntry(tr("建立副本", "Make a copy")) { last = copied },
+                        MenuEntry(tr("删除", "Delete"), danger = true) { confirm = true },
+                    ),
+                )
+            }
             item { Note(tr("菜单开在自己的窗口里，下面垫的是当前页面的模糊快照；右上角的“更多”也是同一个菜单。", "A menu opens in its own window over a blurred snapshot of the page; the More key in the title bar opens the same menu.")) }
             item { SectionHeader(tr("全屏页面", "Full-screen page")) }
             item {
@@ -162,6 +196,16 @@ fun OverlaysPage() {
             last = deleted
         },
         onDismiss = { confirm = false },
+    )
+
+    ChoiceDialog(
+        show = choice,
+        title = tr("导出画质", "Export quality"),
+        message = tr("画质越高，文件越大。", "Higher quality makes larger files."),
+        entries = qualities.mapIndexed { i, label -> ChoiceEntry(i, label, enabled = i != 3) },
+        selected = quality,
+        onSelect = { quality = it },
+        onDismiss = { choice = false },
     )
 
     FormDialog(

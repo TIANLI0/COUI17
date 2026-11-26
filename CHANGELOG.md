@@ -27,6 +27,16 @@
   scaffolds and fields, glass toolbar keys with red-dot badges, and blur / search-bar / bottom-bar
   fixes. Patches 0004 (title marquee now inside upstream's title cross-fade), 0006 and 0010 were
   rebased onto the new sources.
+- `rememberCouiScaleVisibility` / `Modifier.couiScaleVisibility`: the in-place show / hide of a
+  floating control (scale, alpha, foreground blur that follows the system blur switch), ported
+  from COUI-Kit (patch 0012).
+- `GlassMenu(touch = …)`: opened from a long press, the menu opens at the finger, centred on it
+  and kept inside the side margins (coui `PreciseClickState`).
+- `ChoiceDialog` / `ChoiceEntry`: a centred single-choice dialog; the title stays, the message and
+  the options scroll, tapping an option selects it and closes, cancel at the bottom.
+- `LocalBottomFloatingNavigationBarMetrics`: `BottomFloatingNavigationBarMetrics.Compact` tightens
+  the floating navigation capsule (62dp items, 4dp gaps, 10dp ends; four tabs 280dp instead of
+  328dp). The default stays native (patch 0013).
 
 ## 0.1.0
 

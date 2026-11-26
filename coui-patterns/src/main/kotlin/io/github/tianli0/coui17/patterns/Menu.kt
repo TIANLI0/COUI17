@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.IntSize
 import io.github.suqi8.coui.kmp.basic.DropdownImpl
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.ListPopupColumn
+import io.github.suqi8.coui.kmp.basic.PreciseClickState
 import io.github.suqi8.coui.kmp.blur.isBlurEnabled
 import io.github.suqi8.coui.kmp.window.WindowListPopup
 
@@ -42,18 +43,25 @@ data class MenuEntry(
  * divider bars between rows, on frosted glass. Place it inside the anchor's `Box`, next to the key
  * that opens it.
  *
+ * Opened by a touch on a row (a long press) instead of a key, pass [touch]: a
+ * `rememberPreciseClickState()` whose `Modifier.preciseClickAnchor` sits on the row or on the list
+ * holding it. The menu then opens at the finger, centred on it horizontally and kept inside the
+ * window's side margins (COUI `PreciseClickHelper`); keyboard and accessibility opens, which record
+ * no point, fall back to the anchor.
+ *
  * The popup lives in its own window, where there is no page to blur, so it is handed a blurred
  * snapshot of the page it opened over ([rememberPopupGlass]); without one (blur off, below
  * Android 8) it keeps COUI's opaque surface.
  */
 @Composable
-fun GlassMenu(show: Boolean, entries: List<MenuEntry>, onDismiss: () -> Unit) {
+fun GlassMenu(show: Boolean, entries: List<MenuEntry>, onDismiss: () -> Unit, touch: PreciseClickState? = null) {
     val glass = rememberPopupGlass(show)
     WindowListPopup(
         show = show,
         onDismissRequest = onDismiss,
         staticBackdrop = glass?.image,
         staticBackdropWindowSize = glass?.windowSize ?: IntSize.Zero,
+        preciseClickState = touch,
     ) {
         ListPopupColumn {
             entries.forEachIndexed { index, entry ->
