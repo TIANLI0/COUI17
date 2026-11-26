@@ -22,14 +22,14 @@ import android.graphics.BlendMode as AndroidBlendMode
 import android.graphics.RenderEffect as AndroidRenderEffect
 
 @ChecksSdkIntAtLeast(api = 34)
-internal actual fun isKitSurfaceSupported(): Boolean = Build.VERSION.SDK_INT >= 34
+internal actual fun isKitSurfaceSupported(): Boolean = Build.VERSION.SDK_INT >= 34 && !io.github.suqi8.coui.kmp.shader.isRobolectric
 
 @SuppressLint("ObsoleteSdkInt")
 @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
-internal actual fun isKitRenderEffectSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+internal actual fun isKitRenderEffectSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !io.github.suqi8.coui.kmp.shader.isRobolectric
 
 @ChecksSdkIntAtLeast(api = 34)
-internal actual fun isKitSearchBarSupported(): Boolean = Build.VERSION.SDK_INT >= 34
+internal actual fun isKitSearchBarSupported(): Boolean = Build.VERSION.SDK_INT >= 34 && !io.github.suqi8.coui.kmp.shader.isRobolectric
 
 internal actual val isAgslEs3Supported: Boolean = true
 

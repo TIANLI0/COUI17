@@ -146,6 +146,11 @@ fun InfoChip(
     backdrop: Color? = null,
     /** Colour of an action capsule's icon. */
     accent: Color = COUITheme.colorScheme.primary,
+    /**
+     * A glyph of the caller's in place of [dot] / [icon] — an animated one, for a chip that says
+     * something is running (an hourglass turning over). About 15dp, tinted by the caller.
+     */
+    leading: (@Composable () -> Unit)? = null,
 ) {
     val scheme = COUITheme.colorScheme
     val tint = dot?.copy(alpha = 0.16f)
@@ -169,11 +174,14 @@ fun InfoChip(
             .padding(horizontal = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (dot != null) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.size(5.dp))
+        } else if (dot != null) {
             StatusDot(dot, size = 7.dp)
             Spacer(Modifier.size(6.dp))
         }
-        if (icon != null) {
+        if (leading == null && icon != null) {
             Icon(icon, contentDescription = null, tint = if (onClick != null) accent else label, modifier = Modifier.size(15.dp))
             Spacer(Modifier.size(5.dp))
         }

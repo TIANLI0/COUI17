@@ -1,0 +1,41 @@
+diff --git a/coui-shader/src/androidMain/kotlin/io/github/suqi8/coui/kmp/shader/RuntimeShader.android.kt b/coui-shader/src/androidMain/kotlin/io/github/suqi8/coui/kmp/shader/RuntimeShader.android.kt
+index 5558fa0..638f1f6 100644
+--- a/coui-shader/src/androidMain/kotlin/io/github/suqi8/coui/kmp/shader/RuntimeShader.android.kt
++++ b/coui-shader/src/androidMain/kotlin/io/github/suqi8/coui/kmp/shader/RuntimeShader.android.kt
+@@ -14,7 +14,13 @@ import org.intellij.lang.annotations.Language
+ 
+ @SuppressLint("ObsoleteSdkInt")
+ @ChecksSdkIntAtLeast(Build.VERSION_CODES.TIRAMISU)
+-actual fun isRuntimeShaderSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
++actual fun isRuntimeShaderSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !isRobolectric
++
++/**
++ * Robolectric draws through a software canvas, which rejects RuntimeShader (and Mesh): its tests
++ * get the flat fills a device without shaders gets, at any test SDK level.
++ */
++val isRobolectric: Boolean by lazy { Build.FINGERPRINT == "robolectric" }
+ 
+ /**
+  * Creates a platform-specific [RuntimeShader] from an AGSL/SkSL shader string.
+diff --git a/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/kit/effect/CouiPlatformRenderEffect.android.kt b/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/kit/effect/CouiPlatformRenderEffect.android.kt
+index dca3596..bdbbac3 100644
+--- a/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/kit/effect/CouiPlatformRenderEffect.android.kt
++++ b/coui-ui/src/androidMain/kotlin/io/github/suqi8/coui/kmp/kit/effect/CouiPlatformRenderEffect.android.kt
+@@ -22,14 +22,14 @@ import android.graphics.BlendMode as AndroidBlendMode
+ import android.graphics.RenderEffect as AndroidRenderEffect
+ 
+ @ChecksSdkIntAtLeast(api = 34)
+-internal actual fun isKitSurfaceSupported(): Boolean = Build.VERSION.SDK_INT >= 34
++internal actual fun isKitSurfaceSupported(): Boolean = Build.VERSION.SDK_INT >= 34 && !io.github.suqi8.coui.kmp.shader.isRobolectric
+ 
+ @SuppressLint("ObsoleteSdkInt")
+ @ChecksSdkIntAtLeast(api = Build.VERSION_CODES.S)
+-internal actual fun isKitRenderEffectSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
++internal actual fun isKitRenderEffectSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !io.github.suqi8.coui.kmp.shader.isRobolectric
+ 
+ @ChecksSdkIntAtLeast(api = 34)
+-internal actual fun isKitSearchBarSupported(): Boolean = Build.VERSION.SDK_INT >= 34
++internal actual fun isKitSearchBarSupported(): Boolean = Build.VERSION.SDK_INT >= 34 && !io.github.suqi8.coui.kmp.shader.isRobolectric
+ 
+ internal actual val isAgslEs3Supported: Boolean = true
+ 

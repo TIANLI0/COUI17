@@ -14,7 +14,13 @@ import org.intellij.lang.annotations.Language
 
 @SuppressLint("ObsoleteSdkInt")
 @ChecksSdkIntAtLeast(Build.VERSION_CODES.TIRAMISU)
-actual fun isRuntimeShaderSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+actual fun isRuntimeShaderSupported(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !isRobolectric
+
+/**
+ * Robolectric draws through a software canvas, which rejects RuntimeShader (and Mesh): its tests
+ * get the flat fills a device without shaders gets, at any test SDK level.
+ */
+val isRobolectric: Boolean by lazy { Build.FINGERPRINT == "robolectric" }
 
 /**
  * Creates a platform-specific [RuntimeShader] from an AGSL/SkSL shader string.

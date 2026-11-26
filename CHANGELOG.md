@@ -37,6 +37,8 @@
 - `LocalBottomFloatingNavigationBarMetrics`: `BottomFloatingNavigationBarMetrics.Compact` tightens
   the floating navigation capsule (62dp items, 4dp gaps, 10dp ends; four tabs 280dp instead of
   328dp). The default stays native (patch 0013).
+- Under Robolectric, shader / render-effect / Mesh support reports false, so Compose tests can run
+  on API 33+ with glass on screen (patch 0014).
 
 ## 0.1.0
 

@@ -167,6 +167,16 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
   when its bar is squeezed, gaps scaled with it), read by `FloatingCapsuleRow` and the item's
   width bound.
 
+### 0014 — flat fills under Robolectric
+
+- **Files:** `coui-shader/src/androidMain/…/shader/RuntimeShader.android.kt`,
+  `coui-ui/src/androidMain/…/kit/effect/CouiPlatformRenderEffect.android.kt`
+- **Upstream:** shader, render-effect, surface (Mesh) and search-bar support follow the SDK level
+  alone. Robolectric draws through a software canvas that rejects RuntimeShader and cannot build a
+  MeshSpecification, so a Compose test on API 33+ with any glass on screen throws.
+- **Here:** `isRobolectric` (`Build.FINGERPRINT == "robolectric"`) turns those four checks off, so
+  tests get the flat fills a device without shaders gets, at any test SDK. Devices are unchanged.
+
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.
 
