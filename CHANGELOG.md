@@ -15,6 +15,10 @@
   provides localized expand / collapse state words.
 - JVM host tests for `coui-ui` (`:coui-ui:testAndroidHostTest`).
 - Health-check report: `docs/health-check-2026-11.md`.
+- `BasicComponent` takes `titleMaxLines` / `summaryMaxLines`; the `TopTips` close button is
+  announced with the localized `LocalSheetCloseLabel` instead of English "Close";
+  `LocalSearchBarKeyboardType` picks the `SearchBar` keyboard (patch 0009).
+- Dark theme pages are black like ColorOS's default dark style, not `#303030` (patch 0010).
 
 ## 0.1.0
 

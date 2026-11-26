@@ -1,0 +1,18 @@
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/AppBarBlurOverlay.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/AppBarBlurOverlay.kt
+index 83a15cf..e01b171 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/AppBarBlurOverlay.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/AppBarBlurOverlay.kt
+@@ -90,8 +90,12 @@ object AppBarBlurOverlayDefaults {
+      * on top of the night configuration, and the darkening layer is applied by the vendor framework
+      * itself. The rendered value is used here instead, with the light-sensing glass's own alpha ramp
+      * doing the rest.
++     *
++     * That measurement is ColorOS's softest dark style. Its default ("增强", and what the system's
++     * own apps such as File Manager show) is a black page with cards 10 % white over it, so black
++     * is used: on `#303030` pages the cards were `#454545` and code blocks read as holes.
+      */
+-    val DarkContainerColor = Color(0xFF303030)
++    val DarkContainerColor = Color(0xFF000000)
+ 
+     /**
+      * The material base colour for the current theme: the light theme's `surface`, which is

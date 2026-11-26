@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -911,7 +912,9 @@ internal fun InputFieldImpl(
         singleLine = true,
         textStyle = inputTextStyle,
         cursorBrush = cursorBrush,
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardOptions = LocalSearchBarKeyboardType.current.let { type ->
+            KeyboardOptions(keyboardType = type, imeAction = ImeAction.Search, autoCorrectEnabled = type == KeyboardType.Text)
+        },
         keyboardActions = KeyboardActions(
             onSearch = {
                 focusManager.clearFocus()
@@ -1388,3 +1391,10 @@ private fun DisabledPassThrough(
         }
     }
 }
+
+/**
+ * Keyboard of the [SearchBar] text field below this point. Text by default; a search over file or
+ * branch names provides [KeyboardType.Uri] so a CJK input method does not compose ("README_ZH"
+ * turned into "README＿" and never reached the filter) and autocorrect stays off.
+ */
+val LocalSearchBarKeyboardType = androidx.compose.runtime.staticCompositionLocalOf { KeyboardType.Text }

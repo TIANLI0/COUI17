@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package io.github.suqi8.coui.kmp.basic
 
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -75,6 +76,10 @@ import kotlin.math.roundToInt
  * @param interactionSource The [MutableInteractionSource] for the [BasicComponent].
  *   The value should remain null or non-null for the lifetime of this component;
  *   switching across recompositions will allocate a new internal source and lose pending interactions.
+ * @param titleMaxLines Most lines of the title before it ends in an ellipsis (unlimited by default,
+ *   as `COUIPreference`'s title). A list of user-named items (sessions, files) caps it.
+ * @param summaryMaxLines Most lines of the summary before it ends in an ellipsis (unlimited by
+ *   default).
  */
 @Composable
 fun BasicComponent(
@@ -96,6 +101,8 @@ fun BasicComponent(
     holdDownState: Boolean = false,
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    titleMaxLines: Int = Int.MAX_VALUE,
+    summaryMaxLines: Int = Int.MAX_VALUE,
 ) {
     // `COUICustomListSelectedLinearLayout` re-measures its icon once the title and summary have been
     // laid out, because both the icon's margins and its top offset depend on how many lines the text
@@ -133,6 +140,8 @@ fun BasicComponent(
                     style = COUITheme.textStyles.headline1,
                     fontWeight = FontWeight.Medium,
                     color = titleColor.color(enabled),
+                    maxLines = titleMaxLines,
+                    overflow = TextOverflow.Ellipsis,
                     onTextLayout = { titleGeometry.value = it.lineGeometry() },
                 )
             }
@@ -143,6 +152,8 @@ fun BasicComponent(
                     text = summary,
                     style = COUITheme.textStyles.footnote1,
                     color = summaryColor.color(enabled),
+                    maxLines = summaryMaxLines,
+                    overflow = TextOverflow.Ellipsis,
                     onTextLayout = { summaryGeometry.value = it.lineGeometry() },
                 )
             }

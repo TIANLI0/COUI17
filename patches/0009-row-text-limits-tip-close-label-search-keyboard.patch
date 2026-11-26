@@ -1,0 +1,105 @@
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Component.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Component.kt
+index 52c685e..d94b0c0 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Component.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Component.kt
+@@ -2,6 +2,7 @@
+ // SPDX-License-Identifier: Apache-2.0
+ package io.github.suqi8.coui.kmp.basic
+ 
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.interaction.MutableInteractionSource
+ import androidx.compose.foundation.layout.Arrangement
+@@ -75,6 +76,10 @@ import kotlin.math.roundToInt
+  * @param interactionSource The [MutableInteractionSource] for the [BasicComponent].
+  *   The value should remain null or non-null for the lifetime of this component;
+  *   switching across recompositions will allocate a new internal source and lose pending interactions.
++ * @param titleMaxLines Most lines of the title before it ends in an ellipsis (unlimited by default,
++ *   as `COUIPreference`'s title). A list of user-named items (sessions, files) caps it.
++ * @param summaryMaxLines Most lines of the summary before it ends in an ellipsis (unlimited by
++ *   default).
+  */
+ @Composable
+ fun BasicComponent(
+@@ -96,6 +101,8 @@ fun BasicComponent(
+     holdDownState: Boolean = false,
+     enabled: Boolean = true,
+     interactionSource: MutableInteractionSource? = null,
++    titleMaxLines: Int = Int.MAX_VALUE,
++    summaryMaxLines: Int = Int.MAX_VALUE,
+ ) {
+     // `COUICustomListSelectedLinearLayout` re-measures its icon once the title and summary have been
+     // laid out, because both the icon's margins and its top offset depend on how many lines the text
+@@ -133,6 +140,8 @@ fun BasicComponent(
+                     style = COUITheme.textStyles.headline1,
+                     fontWeight = FontWeight.Medium,
+                     color = titleColor.color(enabled),
++                    maxLines = titleMaxLines,
++                    overflow = TextOverflow.Ellipsis,
+                     onTextLayout = { titleGeometry.value = it.lineGeometry() },
+                 )
+             }
+@@ -143,6 +152,8 @@ fun BasicComponent(
+                     text = summary,
+                     style = COUITheme.textStyles.footnote1,
+                     color = summaryColor.color(enabled),
++                    maxLines = summaryMaxLines,
++                    overflow = TextOverflow.Ellipsis,
+                     onTextLayout = { summaryGeometry.value = it.lineGeometry() },
+                 )
+             }
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
+index 9d87ee1..9cc16ba 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
+@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.onClick
+ import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.TextStyle
+ import androidx.compose.ui.text.input.ImeAction
++import androidx.compose.ui.text.input.KeyboardType
+ import androidx.compose.ui.unit.Constraints
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.DpSize
+@@ -911,7 +912,9 @@ internal fun InputFieldImpl(
+         singleLine = true,
+         textStyle = inputTextStyle,
+         cursorBrush = cursorBrush,
+-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
++        keyboardOptions = LocalSearchBarKeyboardType.current.let { type ->
++            KeyboardOptions(keyboardType = type, imeAction = ImeAction.Search, autoCorrectEnabled = type == KeyboardType.Text)
++        },
+         keyboardActions = KeyboardActions(
+             onSearch = {
+                 focusManager.clearFocus()
+@@ -1388,3 +1391,10 @@ private fun DisabledPassThrough(
+         }
+     }
+ }
++
++/**
++ * Keyboard of the [SearchBar] text field below this point. Text by default; a search over file or
++ * branch names provides [KeyboardType.Uri] so a CJK input method does not compose ("README_ZH"
++ * turned into "README＿" and never reached the filter) and autocorrect stays off.
++ */
++val LocalSearchBarKeyboardType = androidx.compose.runtime.staticCompositionLocalOf { KeyboardType.Text }
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopTips.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopTips.kt
+index 29ffb64..90ff970 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopTips.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopTips.kt
+@@ -620,12 +620,15 @@ private fun TopTipsCloseButton(
+     iconColor: Color,
+     onClick: () -> Unit,
+ ) {
++    // Announced with the app's localized close label (the sheets' close capsule uses the same one);
++    // it was a hard-coded English "Close" in every language.
++    val closeLabel = io.github.suqi8.coui.kmp.layout.LocalSheetCloseLabel.current
+     Box(
+         modifier = Modifier
+             .size(TopTipsDefaults.IconSize)
+             .clip(CircleShape)
+             .clickable(onClick = onClick)
+-            .semantics { contentDescription = "Close" },
++            .semantics { contentDescription = closeLabel },
+         contentAlignment = Alignment.Center,
+     ) {
+         Canvas(modifier = Modifier.size(TopTipsDefaults.IconSize)) {

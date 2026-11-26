@@ -112,6 +112,28 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
   while a copy is in flight is copied after it, so the panel ends on the host's last frame
   (`HostCaptureScheduler`, unit-tested in `coui-ui/src/androidHostTest`).
 
+### 0009 — row text limits, localized top-tip close label, search keyboard type
+
+- **Files:** `coui-ui/src/commonMain/…/basic/{Component,TopTips,SearchBar}.kt`
+- **Upstream:** `BasicComponent` has no way to cap its title or summary, so a user-named item (a
+  chat title, a file path) can grow a list row to many lines; the `TopTips` close button announces a
+  hard-coded English "Close" in every language; the `SearchBar` field always uses a text
+  keyboard, so a CJK input method composes file names ("README_ZH" became "README＿").
+- **Here:** `BasicComponent` takes `titleMaxLines` / `summaryMaxLines` (default unlimited, ending in
+  an ellipsis when set), added at the end of the parameter list so positional calls are unchanged.
+  The `TopTips` close button reads its description from `LocalSheetCloseLabel` (patch 0002), the
+  label the app already localizes. `LocalSearchBarKeyboardType` (default `KeyboardType.Text`, so
+  unchanged unless provided) sets the field's keyboard; with a non-text type autocorrect is off.
+
+### 0010 — black dark-theme page
+
+- **File:** `coui-ui/src/commonMain/…/basic/AppBarBlurOverlay.kt`
+- **Upstream:** `AppBarBlurOverlayDefaults.DarkContainerColor` is `#303030`, measured on a device in
+  ColorOS's softest dark style; pages, headers and sheets take it, and cards (10 % white) land at
+  `#454545`.
+- **Here:** black, as ColorOS's default dark style and its own apps (File Manager): cards land at
+  about `#1A1A1A` and nested surfaces such as code blocks no longer read as holes.
+
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.
 

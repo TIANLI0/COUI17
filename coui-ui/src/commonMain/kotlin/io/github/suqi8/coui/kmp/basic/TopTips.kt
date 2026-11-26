@@ -620,12 +620,15 @@ private fun TopTipsCloseButton(
     iconColor: Color,
     onClick: () -> Unit,
 ) {
+    // Announced with the app's localized close label (the sheets' close capsule uses the same one);
+    // it was a hard-coded English "Close" in every language.
+    val closeLabel = io.github.suqi8.coui.kmp.layout.LocalSheetCloseLabel.current
     Box(
         modifier = Modifier
             .size(TopTipsDefaults.IconSize)
             .clip(CircleShape)
             .clickable(onClick = onClick)
-            .semantics { contentDescription = "Close" },
+            .semantics { contentDescription = closeLabel },
         contentAlignment = Alignment.Center,
     ) {
         Canvas(modifier = Modifier.size(TopTipsDefaults.IconSize)) {
