@@ -89,7 +89,7 @@ internal class CouiFloatingRenderer private constructor(internal val surfaceCoun
     internal val shaders = if (standalone) {
         listOf(RuntimeShader(couiFloatingStandaloneShader()))
     } else {
-        listOf(RuntimeShader(couiFloatingShader(1)), RuntimeShader(couiFloatingShader(2)))
+        listOf(RuntimeShader(couiFloatingShader()), RuntimeShader(couiFloatingShader()))
     }
     internal val causticShaders = List(surfaceCount) { RuntimeShader(CouiCausticShader) }
     internal val shadowRenderer = CouiShadowRenderer(surfaceCount)
@@ -200,6 +200,7 @@ internal fun Modifier.couiFloatingPair(
     beforeContent: (DrawScope.(Int, Path) -> Unit)? = null,
     drawOrder: List<Int> = listOf(0, 1),
     foregroundComposition: Boolean = false,
+    animating: Boolean = false,
     surfaces: () -> List<CouiFloatingSurface>,
 ): Modifier {
     require(renderer.surfaceCount == 2)
@@ -209,6 +210,7 @@ internal fun Modifier.couiFloatingPair(
     return floatingSurfaces(
         backdrop, renderer, materials, shadows, shapes, contentLayers, contourGlowEnabled,
         foregroundComposition = foregroundComposition,
+        animating = animating,
         beforeContent = beforeContent, drawOrder = drawOrder, surfaces = surfaces,
     )
 }
@@ -224,6 +226,7 @@ private fun Modifier.floatingSurfaces(
     contourGlowEnabled: Boolean,
     foregroundComposition: Boolean = false,
     useMenuLightEdge: Boolean = false,
+    animating: Boolean = false,
     beforeContent: (DrawScope.(Int, Path) -> Unit)? = null,
     drawOrder: List<Int>? = null,
     surfaces: () -> List<CouiFloatingSurface>,
@@ -233,6 +236,7 @@ private fun Modifier.floatingSurfaces(
     val windowSize = LocalWindowInfo.current.containerSize
     val renderEffectSupported = isKitSurfaceSupported() && isKitRenderEffectSupported()
     val shadowLayers = List(renderer.surfaceCount) { rememberGraphicsLayer() }
+    val shadowRecordKeys = remember(renderer) { arrayOfNulls<ShadowRecordKey>(renderer.surfaceCount) }
     val causticLayers = List(renderer.surfaceCount) { rememberGraphicsLayer() }
     val materialLayers = List(renderer.surfaceCount) { rememberGraphicsLayer() }
     val resolvedForegroundComposition = foregroundComposition || backdrop == null || !backdrop.hasContent
@@ -293,6 +297,9 @@ private fun Modifier.floatingSurfaces(
                 if (clipped.width <= 0f || clipped.height <= 0f) return
                 val bounds = Rect(floor(clipped.left), floor(clipped.top), ceil(clipped.right), ceil(clipped.bottom))
                 layer.topLeft = IntOffset(bounds.left.toInt(), bounds.top.toInt())
+                // Explicitly update the rectangular outline to bounds.size so SkiaGraphicsLayer
+                // never reuses a stale 0x0 or prior-size cached internalOutline when clip = true.
+                layer.setRectOutline(Offset.Zero, bounds.size)
                 layer.clip = true
                 // Full patch uses Src; separated transparent foreground only uses SrcOver.
                 layer.blendMode = blendMode
@@ -357,56 +364,59 @@ private fun Modifier.floatingSurfaces(
                 contentLayers[index].setOutline(outlines[index])
                 contentLayers[index].clip = true
             }
+            val skipHeavyEffectsDuringMotion = preferFastAnimatingFloatingSurfaces && animating
             floatingDrawGroups(shadows.map { it.elevation }).forEach { indices ->
                 val visible = indices.filter { nodes[it].visible }
                 val group = if (drawOrder == null) visible else visible.sortedBy { drawOrder.indexOf(it) }
-                group.forEach { index ->
-                    commands.add(shadowLayers[index])
-                    // In foreground composition, the shader strictly emits transparent below this threshold, so skip recording and caustic layer.
-                    // Full destination mode must still backfill and cannot take this shortcut.
-                    if (contourGlowEnabled && (
-                            !resolvedForegroundComposition ||
-                                shadows[index].causticColor.alpha * nodes[index].alpha > 0.001f
+                if (!skipHeavyEffectsDuringMotion) {
+                    group.forEach { index ->
+                        commands.add(shadowLayers[index])
+                        // In foreground composition, the shader strictly emits transparent below this threshold, so skip recording and caustic layer.
+                        // Full destination mode must still backfill and cannot take this shortcut.
+                        if (contourGlowEnabled && (
+                                !resolvedForegroundComposition ||
+                                    shadows[index].causticColor.alpha * nodes[index].alpha > 0.001f
+                                )
+                        ) {
+                            val node = nodes[index]
+                            val shadow = shadows[index]
+                            val optical = Rect(
+                                shadow.layout.left,
+                                shadow.layout.top,
+                                node.bounds.width + shadow.layout.right,
+                                node.bounds.height + shadow.layout.bottom,
                             )
-                    ) {
-                        val node = nodes[index]
-                        val shadow = shadows[index]
-                        val optical = Rect(
-                            shadow.layout.left,
-                            shadow.layout.top,
-                            node.bounds.width + shadow.layout.right,
-                            node.bounds.height + shadow.layout.bottom,
-                        )
-                        // Toolbar skips destination backfill; default path retains full destination instead of PLUS contribution.
-                        appendPatch(
-                            causticLayers[index],
-                            node.mapRect(optical),
-                            blendMode = if (resolvedForegroundComposition) BlendMode.SrcOver else BlendMode.Src,
-                        ) { bounds ->
-                            renderer.causticShaders[index].apply {
-                                setIntUniform("u_foregroundComposition", if (resolvedForegroundComposition) 1 else 0)
-                                setFloatUniform("u_offset", bounds.left - node.bounds.left, bounds.top - node.bounds.top)
-                                setFloatUniform("u_invScale", 1f / node.scaleX, 1f / node.scaleY)
-                                setFloatUniform(
-                                    "u_commonArray",
-                                    floatArrayOf(
-                                        0f, 0f, 0f, 0f, node.bounds.width,
-                                        node.bounds.height, node.resolvedCornerRadius, 0f, 0f, 0f, 0f, 0f,
-                                    ),
-                                )
-                                setFloatUniform(
-                                    "u_pyrolysisArray",
-                                    floatArrayOf(
-                                        shadow.causticColor.red, shadow.causticColor.green,
-                                        shadow.causticColor.blue, shadow.causticColor.alpha * node.alpha, shadow.layout.left, shadow.layout.top,
-                                        shadow.layout.right, shadow.layout.bottom, shadow.sdf, shadow.power, shadow.powerMix,
-                                        shadow.speed, 0.45f, 0.6f,
-                                    ),
-                                )
-                            }.let { shader ->
-                                val effect = shader.asComposeRenderEffect("u_originShader")
-                                val blurInput = if (resolvedForegroundComposition) causticInputs[index] else null
-                                if (blurInput != null) createChainRenderEffect(effect, blurInput) else effect
+                            // Toolbar skips destination backfill; default path retains full destination instead of PLUS contribution.
+                            appendPatch(
+                                causticLayers[index],
+                                node.mapRect(optical),
+                                blendMode = if (resolvedForegroundComposition) BlendMode.SrcOver else BlendMode.Src,
+                            ) { bounds ->
+                                renderer.causticShaders[index].apply {
+                                    setIntUniform("u_foregroundComposition", if (resolvedForegroundComposition) 1 else 0)
+                                    setFloatUniform("u_offset", bounds.left - node.bounds.left, bounds.top - node.bounds.top)
+                                    setFloatUniform("u_invScale", 1f / node.scaleX, 1f / node.scaleY)
+                                    setFloatUniform(
+                                        "u_commonArray",
+                                        floatArrayOf(
+                                            0f, 0f, 0f, 0f, node.bounds.width,
+                                            node.bounds.height, node.resolvedCornerRadius, 0f, 0f, 0f, 0f, 0f,
+                                        ),
+                                    )
+                                    setFloatUniform(
+                                        "u_pyrolysisArray",
+                                        floatArrayOf(
+                                            shadow.causticColor.red, shadow.causticColor.green,
+                                            shadow.causticColor.blue, shadow.causticColor.alpha * node.alpha, shadow.layout.left, shadow.layout.top,
+                                            shadow.layout.right, shadow.layout.bottom, shadow.sdf, shadow.power, shadow.powerMix,
+                                            shadow.speed, 0.45f, 0.6f,
+                                        ),
+                                    )
+                                }.let { shader ->
+                                    val effect = shader.asComposeRenderEffect("u_originShader")
+                                    val blurInput = if (resolvedForegroundComposition) causticInputs[index] else null
+                                    if (blurInput != null) createChainRenderEffect(effect, blurInput) else effect
+                                }
                             }
                         }
                     }
@@ -436,6 +446,7 @@ private fun Modifier.floatingSurfaces(
                         if (renderer.standalone) {
                             shader.setFloatUniform("u_baseShapeCtxArray", floatingShapeContext(ball[2], ball[3], ball[5], ball[4]))
                         } else {
+                            shader.setFloatUniform("u_materialIndex", material.index.toFloat())
                             val activeBalls = floatingBallSlots(index, materials.map { it.index }).map { slot ->
                                 if (nodes[slot].visible) nodes[slot].ball(height, origin) else FloatArray(8)
                             }
@@ -490,38 +501,61 @@ private fun Modifier.floatingSurfaces(
             onDrawWithContent {
                 // Children only record transparent foreground; final output follows shadow/caustic -> material/content Z grouping.
                 drawContent()
-                shadowLayers.forEachIndexed { index, layer ->
-                    if (!nodes[index].visible) return@forEachIndexed
-                    val bounds = nodes[index].bounds
-                    val node = nodes[index]
-                    val recordSize = IntSize(
-                        ceil(bounds.width * node.scaleX + ShadowOutsetPx * 2f).toInt().coerceAtLeast(1),
-                        ceil(bounds.height * node.scaleY + ShadowOutsetPx * 2f).toInt().coerceAtLeast(1),
-                    )
-                    // Pure shadow does not invoke drawContent; explicit density avoids cyclic proxy delegation.
-                    layer.record(density = recordingDensity, layoutDirection = layoutDirection, size = recordSize) {
-                        drawIntoCanvas { canvas ->
-                            canvas.translate(ShadowOutsetPx, ShadowOutsetPx)
-                            val roundedRect = node.cornerRadius != null &&
-                                node.resolvedCornerRadius < min(bounds.width, bounds.height) * 0.5f
-                            renderer.shadowRenderer.draw(
-                                canvas, index, bounds.width, bounds.height,
-                                node.scaleX, node.scaleY,
-                                windowOrigin.x + (node.bounds.center.x - node.bounds.width * node.scaleX * 0.5f),
-                                windowOrigin.y + (node.bounds.center.y - node.bounds.height * node.scaleY * 0.5f),
-                                node.alpha, shadows[index].color.toArgb(),
-                                shadows[index].elevation, shadows[index].lightY,
-                                if (shadows[index].lightZ > 0f) shadows[index].lightZ else defaultLightZ,
-                                shadows[index].lightRadius,
-                                if (roundedRect) {
-                                    CouiShadowOutline.RoundRect
-                                } else if (shadows[index].smoothCorner) {
-                                    CouiShadowOutline.SmoothCapsule
-                                } else {
-                                    CouiShadowOutline.Oval
-                                },
-                                radius = node.resolvedCornerRadius, clipping = !roundedRect,
-                            )
+                if (!skipHeavyEffectsDuringMotion) {
+                    shadowLayers.forEachIndexed { index, layer ->
+                        if (!nodes[index].visible) return@forEachIndexed
+                        val bounds = nodes[index].bounds
+                        val node = nodes[index]
+                        val shadow = shadows[index]
+                        val resolvedLightZ = if (shadow.lightZ > 0f) shadow.lightZ else defaultLightZ
+                        val winX = windowOrigin.x + (node.bounds.center.x - node.bounds.width * node.scaleX * 0.5f)
+                        val winY = windowOrigin.y + (node.bounds.center.y - node.bounds.height * node.scaleY * 0.5f)
+                        val recordKey = ShadowRecordKey(
+                            width = bounds.width,
+                            height = bounds.height,
+                            scaleX = node.scaleX,
+                            scaleY = node.scaleY,
+                            windowX = winX,
+                            windowY = winY,
+                            alpha = node.alpha,
+                            colorArgb = shadow.color.toArgb(),
+                            elevation = shadow.elevation,
+                            lightY = shadow.lightY,
+                            lightZ = resolvedLightZ,
+                            lightRadius = shadow.lightRadius,
+                            cornerRadius = node.resolvedCornerRadius,
+                            smoothCorner = shadow.smoothCorner,
+                        )
+                        if (shadowRecordKeys[index] == recordKey) return@forEachIndexed
+                        shadowRecordKeys[index] = recordKey
+                        val recordSize = IntSize(
+                            ceil(bounds.width * node.scaleX + ShadowOutsetPx * 2f).toInt().coerceAtLeast(1),
+                            ceil(bounds.height * node.scaleY + ShadowOutsetPx * 2f).toInt().coerceAtLeast(1),
+                        )
+                        // Pure shadow does not invoke drawContent; explicit density avoids cyclic proxy delegation.
+                        layer.record(density = recordingDensity, layoutDirection = layoutDirection, size = recordSize) {
+                            drawIntoCanvas { canvas ->
+                                canvas.translate(ShadowOutsetPx, ShadowOutsetPx)
+                                val roundedRect = node.cornerRadius != null &&
+                                    node.resolvedCornerRadius < min(bounds.width, bounds.height) * 0.5f
+                                renderer.shadowRenderer.draw(
+                                    canvas, index, bounds.width, bounds.height,
+                                    node.scaleX, node.scaleY,
+                                    winX, winY,
+                                    node.alpha, shadow.color.toArgb(),
+                                    shadow.elevation, shadow.lightY,
+                                    resolvedLightZ,
+                                    shadow.lightRadius,
+                                    if (roundedRect) {
+                                        CouiShadowOutline.RoundRect
+                                    } else if (shadow.smoothCorner) {
+                                        CouiShadowOutline.SmoothCapsule
+                                    } else {
+                                        CouiShadowOutline.Oval
+                                    },
+                                    radius = node.resolvedCornerRadius, clipping = !roundedRect,
+                                )
+                            }
                         }
                     }
                 }
@@ -544,12 +578,43 @@ private fun Modifier.floatingSurfaces(
                 }
             }
         } else {
-            onDrawWithContent { drawContent() }
+            onDrawWithContent {
+                drawContent()
+                // Children record into contentLayers whenever renderEffectSupported is true, so draw
+                // them even on the initial pass before coordinates/bounds settle to avoid a 1-frame drop.
+                if (renderEffectSupported) {
+                    nodes.forEachIndexed { index, node ->
+                        if (node.visible) {
+                            val layer = contentLayers[index]
+                            if (layer.size.width > 0 && layer.size.height > 0) {
+                                drawLayer(layer)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 private data class FloatingPatch(val layer: GraphicsLayer, val bounds: Rect, val prefix: List<GraphicsLayer>)
+
+private data class ShadowRecordKey(
+    val width: Float,
+    val height: Float,
+    val scaleX: Float,
+    val scaleY: Float,
+    val windowX: Float,
+    val windowY: Float,
+    val alpha: Float,
+    val colorArgb: Int,
+    val elevation: Float,
+    val lightY: Float,
+    val lightZ: Float,
+    val lightRadius: Float,
+    val cornerRadius: Float,
+    val smoothCorner: Boolean,
+)
 
 private fun GraphicsLayer.setOutline(outline: Outline) {
     when (outline) {

@@ -1,7 +1,7 @@
 diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt
 --- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt
 +++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingNavigationBar.kt
-@@ -473,6 +473,16 @@ private fun BottomFloatingNavigationBarCapsule(
+@@ -489,6 +489,16 @@ private fun BottomFloatingNavigationBarCapsule(
                              // params; keep the Compose rim there.
                              surface = if (platform != null && !platform.drawsOwnStroke) {
                                  Modifier.glassRim(shape, isDark)
@@ -18,7 +18,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Bottom
                              } else {
                                  Modifier
                              },
-@@ -529,6 +539,14 @@ private fun BottomFloatingNavigationBarMeltBall(
+@@ -545,6 +555,14 @@ private fun BottomFloatingNavigationBarMeltBall(
          label = "meltBallExpansion",
      )
  
@@ -33,7 +33,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Bottom
      var capsuleWidthPx by remember { mutableIntStateOf(0) }
      val gap = sideSpacing * progress
      val expansionFootprint = expansionSize * progress
-@@ -707,6 +725,17 @@ private fun BottomFloatingNavigationBarMeltBall(
+@@ -723,6 +741,17 @@ private fun BottomFloatingNavigationBarMeltBall(
                                  shape = shape,
                                  lightParams = SpotLightDefaults.opaqueMedium2(isDark),
                                  motionState = menuTouchState,
@@ -51,7 +51,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Bottom
                              ),
                          // COUI narrows the menu view by exactly the expansion view's footprint plus the
                          // side spacing while the expansion view is active, and hands it the full width
-@@ -734,7 +763,7 @@ private fun BottomFloatingNavigationBarMeltBall(
+@@ -750,7 +779,7 @@ private fun BottomFloatingNavigationBarMeltBall(
                                      extraTransform = {
                                          scaleX *= progress
                                          scaleY *= progress
@@ -60,7 +60,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Bottom
                                      },
                                  ),
                          ) {
-@@ -1095,6 +1124,20 @@ object BottomFloatingNavigationBarDefaults {
+@@ -1161,6 +1190,20 @@ object BottomFloatingNavigationBarDefaults {
       */
      val CausticColor = Color(0x42FFFFFF)
  
@@ -84,7 +84,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Bottom
 diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt
 --- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt
 +++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/MaterialShadowEdge.kt
-@@ -756,6 +756,8 @@ private fun Modifier.drawMaterialShadowEdge(
+@@ -769,6 +769,8 @@ private fun Modifier.drawMaterialShadowEdge(
   * @param cornerWeight The `u_commonArray[10]` corner weight.
   * @param fade The inner-shadow reach; only its shadow fields are read.
   * @param shadowStyle The inner-shadow style, one of the [InnerShadowStyle] presets.
@@ -93,7 +93,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Materi
   */
  @Composable
  fun Modifier.materialInnerGlow(
-@@ -763,6 +765,7 @@ fun Modifier.materialInnerGlow(
+@@ -776,6 +778,7 @@ fun Modifier.materialInnerGlow(
      cornerWeight: Float = MaterialShadowEdgeDefaults.InnerGlowCornerWeight,
      fade: MaterialStrokeParams = MaterialShadowEdgeDefaults.InnerGlowFade,
      shadowStyle: InnerShadowStyle = InnerShadowStyle.SHADOW_STYLE_2,
@@ -101,7 +101,7 @@ diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Materi
  ): Modifier {
      val density = LocalDensity.current.density
      val shader = rememberMaterialShadowEdgeShader(isRuntimeShaderSupported()) ?: return this
-@@ -785,8 +788,13 @@ fun Modifier.materialInnerGlow(
+@@ -798,8 +801,13 @@ fun Modifier.materialInnerGlow(
              edgeEnabled = false,
          )
          onDrawWithContent {

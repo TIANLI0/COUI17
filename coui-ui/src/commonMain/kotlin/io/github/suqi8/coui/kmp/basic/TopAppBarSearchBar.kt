@@ -20,7 +20,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -212,15 +214,26 @@ private fun TopAppBarSearchBarImpl(
         onBackCompleted = closeSearch,
     )
 
+    BindSearchFilterBarBridge(expanded = expanded)
+
     val useKitSurface = isKitSurfaceSupported() && isKitSearchBarSupported() && resolvedBackdrop != null
 
     if (scrollBehavior != null) {
         if (useKitSurface) {
             val state = rememberCouiTopAppBarSearchState(expanded)
+            // When not nested inside a pre-blurred TopAppBarSurface, resolvedBackdrop holds the
+            // raw page layer; pass the reference blur radius so both collapsed buttons and the
+            // expanded search/cancel capsules blur what they cover instead of painting sharp grey.
+            val sampleBlurRadius = if (localCouiBackdrop == null) {
+                with(density) { CouiTopAppBarDefaults.referenceBlurRadius.toPx() }
+            } else {
+                LocalCouiToolbarSampleBlurRadius.current
+            }
             SharedTransitionScope { overlayModifier ->
                 CompositionLocalProvider(
                     LocalCouiToolbarBackdrop provides resolvedBackdrop,
                     LocalCouiToolbarOverlay provides this@SharedTransitionScope,
+                    LocalCouiToolbarSampleBlurRadius provides sampleBlurRadius,
                 ) {
                     Box(modifier = modifier.fillMaxWidth().then(overlayModifier)) {
                         TopAppBarWithSearch(
@@ -494,7 +507,7 @@ private fun TopAppBarSearchBarImpl(
         val sampleBlurRadius = if (localCouiBackdrop == null) {
             with(density) { CouiTopAppBarDefaults.referenceBlurRadius.toPx() }
         } else {
-            0f
+            LocalCouiToolbarSampleBlurRadius.current
         }
         SharedTransitionScope { overlayModifier ->
             CompositionLocalProvider(
@@ -515,6 +528,21 @@ private fun TopAppBarSearchBarImpl(
             dark = dark,
         ) {
             barContent()
+        }
+    }
+}
+
+@Composable
+private fun BindSearchFilterBarBridge(expanded: Boolean) {
+    val bridge = LocalSearchFilterBarBridge.current ?: return
+    SideEffect {
+        if (!bridge.bound) bridge.bound = true
+        if (bridge.expanded != expanded) bridge.expanded = expanded
+    }
+    DisposableEffect(bridge) {
+        onDispose {
+            bridge.bound = false
+            bridge.expanded = true
         }
     }
 }

@@ -22,6 +22,11 @@
 - `coui-nav` from upstream: a back-stack host (`NavDisplay`) whose push / pop, system predictive
   back and in-page swipe drive one position, so the gesture follows the finger. Its swipe leaves
   drags to the page (horizontal scrollers, selection) that claim them first (patch 0011).
+- Synced to upstream `a5c173e` (21 commits from `7135f75`): new top-bar forms, `SwipeRevealBox`
+  / `SwipeActionItem`, settings-search result cards with pinyin matching, IME bring-into-view in
+  scaffolds and fields, glass toolbar keys with red-dot badges, and blur / search-bar / bottom-bar
+  fixes. Patches 0004 (title marquee now inside upstream's title cross-fade), 0006 and 0010 were
+  rebased onto the new sources.
 
 ## 0.1.0
 
