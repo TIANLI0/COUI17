@@ -177,6 +177,18 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
 - **Here:** `isRobolectric` (`Build.FINGERPRINT == "robolectric"`) turns those four checks off, so
   tests get the flat fills a device without shaders gets, at any test SDK. Devices are unchanged.
 
+### 0015 — app bar material like ColorOS Gallery
+
+- **Files:** `coui-ui/src/commonMain/…/basic/{AppBarBlurOverlay,TopAppBar}.kt`
+- **Upstream:** the light tint ramp is a three-stop linear gradient (0 / 0.7 / 1 at 0 / 40 / 100 %),
+  and a top bar with a scroll behavior always fades its material in over the first 30dp of scroll.
+- **Here:** the ramp samples a monotone cubic through the same stops (Fritsch-Butland interior,
+  limited three-point endpoint slopes), the curve COUI's `GradientBackgroundDrawable` bakes into
+  its per-pixel ramp, so the 40 % shoulder is soft. `LocalAppBarMaterialScrollDriven` (default
+  `true`, unchanged) lets an app keep the material on at rest, as `AppBarBlurOverlayView` does
+  unless `scrollDrivenAlphaEnabled` is set — what ColorOS Gallery's pages inflate. Radii (30 → 0,
+  speed 3), the dark ramp (0.4 → 0) and the 8dp band were already the framework's.
+
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.
 

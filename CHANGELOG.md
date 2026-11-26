@@ -39,6 +39,9 @@
   328dp). The default stays native (patch 0013).
 - Under Robolectric, shader / render-effect / Mesh support reports false, so Compose tests can run
   on API 33+ with glass on screen (patch 0014).
+- App bar material: the light tint ramp follows COUI's monotone cubic curve, and
+  `LocalAppBarMaterialScrollDriven = false` keeps the material on at rest like ColorOS Gallery
+  (patch 0015).
 
 ## 0.1.0
 

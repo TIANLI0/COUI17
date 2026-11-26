@@ -635,11 +635,20 @@ private fun appBarBlurOverlayBrush(
                 1f to color.copy(alpha = AppBarGlassDefaults.GradientAlpha0),
             )
         } else {
-            Brush.verticalGradient(
-                0f to color.copy(alpha = AppBarGlassDefaults.GradientAlpha2),
-                1f - AppBarGlassDefaults.GradientPos1 to color.copy(alpha = AppBarGlassDefaults.GradientAlpha1),
-                1f to color.copy(alpha = AppBarGlassDefaults.GradientAlpha0),
+            // `GradientBackgroundDrawable` does not interpolate its stops linearly: it fits a
+            // monotone cubic (Fritsch-Carlson slopes) through them and bakes the curve into a
+            // per-pixel ramp. Sampling that curve keeps the shoulder at 40% soft instead of the
+            // two straight segments a three-stop LinearGradient draws.
+            val curve = MonotoneAlphaCurve(
+                floatArrayOf(AppBarGlassDefaults.GradientPos0, AppBarGlassDefaults.GradientPos1, AppBarGlassDefaults.GradientPos2),
+                floatArrayOf(AppBarGlassDefaults.GradientAlpha0, AppBarGlassDefaults.GradientAlpha1, AppBarGlassDefaults.GradientAlpha2),
             )
+            val stops = Array(GRADIENT_SAMPLES + 1) { i ->
+                val y = i / GRADIENT_SAMPLES.toFloat()
+                // Compose runs top -> bottom, the native ramp bottom -> top.
+                y to color.copy(alpha = curve.alphaAt(1f - y))
+            }
+            Brush.verticalGradient(*stops)
         }
     } else {
         val tail = 1f - mid
@@ -664,3 +673,72 @@ private fun appBarBlurOverlayBrush(
         }
     }
 }
+
+/** Samples of the light ramp's monotone curve: enough that no straight segment shows. */
+private const val GRADIENT_SAMPLES = 24
+
+/**
+ * The alpha curve of `GradientBackgroundDrawable`: monotone cubic Hermite through ([positions],
+ * [alphas]) (position 0 = the node's bottom edge, 1 = its top), with Fritsch-Butland interior
+ * slopes and three-point endpoint slopes limited to keep the curve monotone, clamped to `0..1`.
+ */
+internal class MonotoneAlphaCurve(private val positions: FloatArray, private val alphas: FloatArray) {
+    private val slopes: FloatArray = FloatArray(positions.size).also { m ->
+        val n = positions.size
+        if (n < 2) return@also
+        val h = FloatArray(n - 1) { positions[it + 1] - positions[it] }
+        val d = FloatArray(n - 1) { if (h[it] == 0f) 0f else (alphas[it + 1] - alphas[it]) / h[it] }
+        if (n == 2) {
+            m[0] = d[0]
+            m[1] = d[0]
+            return@also
+        }
+        for (k in 1 until n - 1) {
+            m[k] = if (d[k - 1] * d[k] <= 0f) {
+                0f
+            } else {
+                val w1 = 2f * h[k] + h[k - 1]
+                val w2 = h[k] + 2f * h[k - 1]
+                (w1 + w2) / (w1 / d[k - 1] + w2 / d[k])
+            }
+        }
+        m[0] = endpointSlope(h[0], h[1], d[0], d[1])
+        m[n - 1] = endpointSlope(h[n - 2], h[n - 3], d[n - 2], d[n - 3])
+    }
+
+    private fun endpointSlope(h0: Float, h1: Float, d0: Float, d1: Float): Float {
+        val s = ((2f * h0 + h1) * d0 - h0 * d1) / (h0 + h1)
+        return when {
+            s * d0 <= 0f -> 0f
+            d0 * d1 <= 0f && kotlin.math.abs(s) > kotlin.math.abs(3f * d0) -> 3f * d0
+            else -> s
+        }
+    }
+
+    fun alphaAt(position: Float): Float {
+        val n = positions.size
+        if (n == 0) return 0f
+        if (position <= positions.first()) return alphas.first().coerceIn(0f, 1f)
+        if (position >= positions.last()) return alphas.last().coerceIn(0f, 1f)
+        var k = 1
+        while (k < n - 1 && position > positions[k]) k++
+        val h = positions[k] - positions[k - 1]
+        if (h <= 0f) return alphas[k].coerceIn(0f, 1f)
+        val t = (position - positions[k - 1]) / h
+        val t2 = t * t
+        val t3 = t2 * t
+        val v = (2f * t3 - 3f * t2 + 1f) * alphas[k - 1] +
+            (t3 - 2f * t2 + t) * h * slopes[k - 1] +
+            (-2f * t3 + 3f * t2) * alphas[k] +
+            (t3 - t2) * h * slopes[k]
+        return v.coerceIn(0f, 1f)
+    }
+}
+
+/**
+ * Whether a top app bar's material follows the scroll (`AppBarBlurOverlayView`'s
+ * `scrollDrivenAlphaEnabled = true`: invisible at rest, full after 30dp of content has scrolled
+ * under the bar) or stays on (`false`, the framework's default and what most ColorOS 17 pages —
+ * Gallery's timeline among them — inflate). Default `true`, the behaviour before this local.
+ */
+val LocalAppBarMaterialScrollDriven = compositionLocalOf { true }

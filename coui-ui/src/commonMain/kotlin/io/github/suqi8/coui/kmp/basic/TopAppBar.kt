@@ -213,12 +213,14 @@ private fun AppBarMaterialScaffold(
 ) {
     val density = LocalDensity.current
     // `AppBarBlurOverlayBehavior`'s scroll-driven alpha: invisible at rest, fully visible after
-    // 30dp of content has scrolled under the bar. A bar without a scroll behavior keeps the
-    // material always on, the way `scrollDrivenAlphaEnabled=false` does natively.
-    val scrollFraction = remember(scrollBehavior, density) {
+    // 30dp of content has scrolled under the bar. A bar without a scroll behavior, or under
+    // [LocalAppBarMaterialScrollDriven] = false, keeps the material always on, the way
+    // `scrollDrivenAlphaEnabled=false` does natively.
+    val scrollDriven = LocalAppBarMaterialScrollDriven.current
+    val scrollFraction = remember(scrollBehavior, density, scrollDriven) {
         {
             val behavior = scrollBehavior
-            if (behavior == null) {
+            if (behavior == null || !scrollDriven) {
                 1f
             } else {
                 appBarMaterialAlpha(
