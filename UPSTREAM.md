@@ -20,12 +20,12 @@ MPL-2.0 with their headers; this repository is their published source.
 
 | Path | Origin |
 | :--- | :--- |
-| `coui-{shader,blur,squircle,core,ui,preference,icons}/src/{commonMain,androidMain}` | Upstream, at the commit in [`UPSTREAM_SHA`](UPSTREAM_SHA), plus `patches/*.patch` |
+| `coui-{shader,blur,squircle,core,ui,preference,icons,nav}/src/{commonMain,androidMain}` | Upstream, at the commit in [`UPSTREAM_SHA`](UPSTREAM_SHA), plus `patches/*.patch` |
 | `LICENSE`, `THIRD-PARTY-LICENSES.md` | Upstream |
 | `coui-*/build.gradle.kts`, `settings.gradle.kts`, `gradle/` | This repository (Android-only Kotlin Multiplatform modules, own toolchain versions) |
 | `coui-patterns/`, `gallery/`, `docs/`, `tools/`, `.github/` | This repository |
 
-Not taken from upstream: its other targets (iOS, desktop, web), `coui-nav` / `coui-navigation3-ui`,
+Not taken from upstream: its other targets (iOS, desktop, web), `coui-navigation3-ui`,
 its sample apps, tests, documentation site and build logic. The package prefix
 `io.github.suqi8.coui.kmp` is kept so upstream changes apply without rewriting, and so code written
 against upstream compiles against this repository unchanged.
@@ -133,6 +133,17 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
   `#454545`.
 - **Here:** black, as ColorOS's default dark style and its own apps (File Manager): cards land at
   about `#1A1A1A` and nested surfaces such as code blocks no longer read as holes.
+
+### 0011 — nav swipe yields to the page
+
+- **File:** `coui-nav/src/commonMain/…/nav/gesture/NavSwipeDismiss.kt`
+- **Upstream:** the opt-in swipe-to-dismiss watches the finger on the `Initial` pass, before the
+  page, and claims any drag in the dismiss direction past touch slop. A horizontally scrolled code
+  block, chip row or text selection then pops the page when the finger moves back right.
+- **Here:** engagement watches the `Main` pass, after the page, and gives up as soon as something
+  in the page consumed the finger; the follow phase is unchanged (once claimed, every change is
+  consumed on the `Initial` pass). A drag nothing in the page wanted still engages anywhere on
+  screen.
 
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.

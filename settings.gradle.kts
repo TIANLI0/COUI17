@@ -38,6 +38,7 @@ include(":coui-core")
 include(":coui-ui")
 include(":coui-preference")
 include(":coui-icons")
+include(":coui-nav")
 // Page-level patterns built from the components (this repository's own module).
 include(":coui-patterns")
 // Demo application.

@@ -1,0 +1,45 @@
+diff --git a/coui-nav/src/commonMain/kotlin/io/github/suqi8/coui/kmp/nav/gesture/NavSwipeDismiss.kt b/coui-nav/src/commonMain/kotlin/io/github/suqi8/coui/kmp/nav/gesture/NavSwipeDismiss.kt
+--- a/coui-nav/src/commonMain/kotlin/io/github/suqi8/coui/kmp/nav/gesture/NavSwipeDismiss.kt
++++ b/coui-nav/src/commonMain/kotlin/io/github/suqi8/coui/kmp/nav/gesture/NavSwipeDismiss.kt
+@@ -43,12 +43,13 @@ import kotlin.math.abs
+  * and in-page taps/scrolls fired while the gesture was driving the transition. The unified handler
+  * instead works in two phases:
+  *
+- * 1. **Engagement** — movement is watched on [PointerEventPass.Initial] (parent-first), so the moment
+- *    travel **in the dismiss direction** crosses the [androidx.compose.ui.platform.ViewConfiguration]
+- *    touch slop **and** dominates the cross axis, the pointer is claimed (consumed) before any nested
+- *    scrollable can take it. A drag that is clearly cross-axis dominant is left untouched, so the
+- *    page's own scrolling and taps still work when there is no dismiss intent. Travel opposite the
+- *    dismiss direction never engages (there is nothing to drag the entry "forward" toward).
++ * 1. **Engagement** — movement is watched on [PointerEventPass.Main] after the page has seen it, so
++ *    a horizontal scroller, a text selection or any in-page drag that consumes the finger first
++ *    keeps it. Only when unconsumed travel **in the dismiss direction** crosses the
++ *    [androidx.compose.ui.platform.ViewConfiguration] touch slop **and** dominates the cross axis is
++ *    the pointer claimed (consumed). A drag that is clearly cross-axis dominant is left untouched, so
++ *    the page's own scrolling and taps still work when there is no dismiss intent. Travel opposite
++ *    the dismiss direction never engages (there is nothing to drag the entry "forward" toward).
+  * 2. **Follow** — once claimed, **every** pointer change is consumed on **both** axes, so neither a
+  *    nested scroll nor any in-page handler can act on the finger that is driving the dismiss, and a
+  *    cross-axis wiggle can no longer steal or cancel the gesture. The dismiss ends **only** on finger
+@@ -171,15 +172,19 @@ internal fun Modifier.navSwipeDismissImpl(
+             val velocityTracker = VelocityTracker()
+             velocityTracker.addPosition(down.uptimeMillis, down.position)
+ 
+-            // --- Engagement phase: decide whether this is our dismiss swipe, watching Initial pass. ---
++            // --- Engagement phase: decide whether this is our dismiss swipe, watching the Main pass
++            // AFTER the page: a horizontal scroller (code block, chip row), a text selection or any
++            // other in-page drag that claims the finger first keeps it, and the swipe only engages on
++            // movement nothing inside the page wanted. ---
+             var preClaimDrag = 0f // accumulated travel on the gesture axis (raw signed pixels)
+             var crossTravel = 0f // accumulated travel on the cross axis (raw signed pixels)
+             var claimed = false
+             while (!claimed) {
+-                val event = awaitPointerEvent(PointerEventPass.Initial)
++                val event = awaitPointerEvent(PointerEventPass.Main)
+                 val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                 velocityTracker.addPosition(change.uptimeMillis, change.position)
+                 if (!change.pressed) return@awaitEachGesture // lifted before engaging: a tap / short press
++                if (change.isConsumed) return@awaitEachGesture // the page took this drag
+                 val delta = change.positionChange()
+                 preClaimDrag += if (isHorizontal) delta.x else delta.y
+                 crossTravel += if (isHorizontal) delta.y else delta.x

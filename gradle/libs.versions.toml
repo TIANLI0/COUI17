@@ -13,6 +13,9 @@ androidx-navigationevent = "1.2.0"
 jetbrains-compose-window-size = "1.9.0"
 materialkolor-utilities = "5.0.1"  # 6.x removes DynamicScheme, which the theme's Monet mapping uses
 androidx-core = "1.19.1"
+# coui-nav
+androidx-lifecycle = "2.11.1"
+kotlinx-serialization = "1.13.0"
 
 # Gallery
 androidx-activity = "1.13.0"
@@ -24,6 +27,9 @@ junit4 = "4.13.2"
 jetbrains-compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
 jetbrains-compose-window-size = { module = "org.jetbrains.compose.material3:material3-window-size-class", version.ref = "jetbrains-compose-window-size" }
 androidx-navigationevent = { module = "androidx.navigationevent:navigationevent-compose", version.ref = "androidx-navigationevent" }
+androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 materialkolor-utilities = { module = "com.materialkolor:material-color-utilities", version.ref = "materialkolor-utilities" }
 
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }

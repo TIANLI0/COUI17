@@ -37,6 +37,7 @@ MODULES = [
     "coui-ui",
     "coui-preference",
     "coui-icons",
+    "coui-nav",
 ]
 SOURCE_SETS = ["commonMain", "androidMain"]
 TOP_LEVEL_FILES = ["LICENSE", "THIRD-PARTY-LICENSES.md"]

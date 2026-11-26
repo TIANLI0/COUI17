@@ -19,6 +19,9 @@
   announced with the localized `LocalSheetCloseLabel` instead of English "Close";
   `LocalSearchBarKeyboardType` picks the `SearchBar` keyboard (patch 0009).
 - Dark theme pages are black like ColorOS's default dark style, not `#303030` (patch 0010).
+- `coui-nav` from upstream: a back-stack host (`NavDisplay`) whose push / pop, system predictive
+  back and in-page swipe drive one position, so the gesture follows the finger. Its swipe leaves
+  drags to the page (horizontal scrollers, selection) that claim them first (patch 0011).
 
 ## 0.1.0
 

@@ -12,6 +12,7 @@ A ColorOS 17 styled Jetpack Compose component library for Android: squircle corn
 | `coui-preference` | Settings rows: arrow, switch, radio, checkbox, slider, dropdown, input |
 | `coui-patterns` | Page-level patterns: the `Page` scaffold, `GroupCard`, button tiers, `PanelSheet`, `GlassMenu`, floating glass surfaces, state views, `COUI17Theme` |
 | `coui-icons` | ColorOS icons (`COUIIcons.*`) |
+| `coui-nav` | Back-stack navigation: `NavDisplay`, where push, pop, system predictive back and an in-page swipe drive one position, so the gesture follows the finger (optional) |
 | `coui-blur` | Backdrop sampling and blur: `LayerBackdrop`, progressive blur, highlights |
 | `coui-squircle` | Squircle shapes (`SquircleShape`) with pre-baked SDFs |
 | `coui-shader` / `coui-core` | RuntimeShader wrappers, shared annotations and utilities |
@@ -25,7 +26,7 @@ Requirements: minSdk 23, compileSdk 37, Kotlin 2.4, JDK 21.
 The library is not on Maven Central. Either add this repository as a git submodule and include the modules from your `settings.gradle.kts`:
 
 ```kotlin
-listOf("coui-shader", "coui-blur", "coui-squircle", "coui-core", "coui-ui", "coui-preference", "coui-icons", "coui-patterns").forEach { name ->
+listOf("coui-shader", "coui-blur", "coui-squircle", "coui-core", "coui-ui", "coui-preference", "coui-icons", "coui-nav", "coui-patterns").forEach { name ->
     include(":$name")
     project(":$name").projectDir = file("third_party/COUI17/$name")
 }

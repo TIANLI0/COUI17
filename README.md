@@ -12,6 +12,7 @@ ColorOS 17 风格的 Jetpack Compose 组件库（Android）。超椭圆圆角、
 | `coui-preference` | 设置页的行：箭头、开关、单选、复选、滑块、下拉、输入等偏好项 |
 | `coui-patterns` | 页面级模式：`Page` 页面骨架、`GroupCard` 分组卡片、按钮分级、`PanelSheet` 面板、`GlassMenu` 玻璃菜单、悬浮玻璃材质、状态页、`COUI17Theme` |
 | `coui-icons` | ColorOS 图标（`COUIIcons.*`） |
+| `coui-nav` | 页面栈导航：`NavDisplay`，推入、返回、系统预测性返回和页内右滑驱动同一个位置，手势跟手（可选） |
 | `coui-blur` | 背景采样与模糊：`LayerBackdrop`、渐进模糊、高光 |
 | `coui-squircle` | 超椭圆形状（`SquircleShape`），带预烘焙的 SDF |
 | `coui-shader` / `coui-core` | RuntimeShader 封装、公共注解与工具 |
@@ -27,7 +28,7 @@ ColorOS 17 风格的 Jetpack Compose 组件库（Android）。超椭圆圆角、
 **作为源码（推荐，随时跟进）**：把本仓库加为 git submodule，然后在你的 `settings.gradle.kts` 里引入模块：
 
 ```kotlin
-listOf("coui-shader", "coui-blur", "coui-squircle", "coui-core", "coui-ui", "coui-preference", "coui-icons", "coui-patterns").forEach { name ->
+listOf("coui-shader", "coui-blur", "coui-squircle", "coui-core", "coui-ui", "coui-preference", "coui-icons", "coui-nav", "coui-patterns").forEach { name ->
     include(":$name")
     project(":$name").projectDir = file("third_party/COUI17/$name")
 }
