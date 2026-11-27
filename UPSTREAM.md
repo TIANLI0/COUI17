@@ -238,6 +238,16 @@ back. Apply the trailing capsule's slide in pixel coordinates.
 Keep the scroll fade inside the sheet body. Let the toolbar share the handle's drag gesture, and
 measure the panel before revealing it. Hold a point-anchored menu in place during its exit.
 
+### 0025 — panel toolbar buttons, full-panel drag, and backdrop readiness
+
+Align sheet toolbar buttons (`SheetCloseCapsule`, `SheetActionButton`) with COUI17's
+`ToolbarMaterialEffectDelegate` blur fill, `1.8dp` dark/light rim alpha, and touch-motion
+deformation. Share vertical dismiss drag across the full sheet (`COUIBottomSheetBehavior`
+`mGlobalDrag`), place the header gap above `BottomSheetScrollableBody` so the scroll-fade mask
+never clips mid-gap, expose explicit bottom panel padding without IME coupling, add `onLongClick`
+to `BasicComponent` on its hold-down interaction source, and wait briefly for the first
+`HostWindowBackdrop` capture before revealing `WindowBottomSheet` and `WindowListPopup`.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on

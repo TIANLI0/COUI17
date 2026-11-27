@@ -1,10 +1,11 @@
 package io.github.tianli0.coui17.gallery
 
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.ui.draw.clip
 import io.github.suqi8.coui.kmp.basic.preciseClickAnchor
 import io.github.suqi8.coui.kmp.basic.rememberPreciseClickState
 import io.github.tianli0.coui17.patterns.ChoiceEntry
 import io.github.tianli0.coui17.patterns.ChoiceDialog
+import io.github.tianli0.coui17.patterns.groupRowShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -182,7 +183,11 @@ fun OverlaysPage(onSpecializedDialogs: () -> Unit) {
                     BasicComponent(
                         title = tr("长按这一行", "Long-press this row"),
                         summary = tr("菜单开在手指处，横向对准触点", "The menu opens at the finger, centred on it"),
-                        modifier = Modifier.combinedClickable(onClick = {}, onLongClick = { pressMenu = true }),
+                        cardListPosition = cardListPositionOf(0, 1),
+                        holdDownState = pressMenu,
+                        onClick = {},
+                        onLongClick = { pressMenu = true },
+                        modifier = Modifier.clip(groupRowShape(cardListPositionOf(0, 1))),
                     )
                 }
                 GlassMenu(

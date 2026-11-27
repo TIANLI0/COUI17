@@ -19,10 +19,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsIgnoringVisibility
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
@@ -71,8 +73,11 @@ fun PanelSheet(
     modifier: Modifier = Modifier,
     confirm: SheetConfirm? = null,
     endAction: (@Composable () -> Unit)? = null,
+    imePadding: Boolean = true,
     content: @Composable () -> Unit,
 ) {
+    @OptIn(ExperimentalLayoutApi::class)
+    val navBottom = WindowInsets.navigationBarsIgnoringVisibility.asPaddingValues().calculateBottomPadding()
     WindowBottomSheet(
         show = show,
         modifier = modifier,
@@ -91,10 +96,12 @@ fun PanelSheet(
         },
         backgroundColor = pageContainerColor(),
         insideMargin = DpSize(0.dp, 0.dp),
+        defaultWindowInsetsPadding = imePadding,
+        panelPaddingBottom = navBottom,
+        headerBottomPadding = 8.dp,
         onDismissRequest = onDismissRequest,
     ) {
         Column(Modifier.fillMaxWidth()) {
-            Spacer(Modifier.height(8.dp))
             CompositionLocalProvider(LocalOnPageColor provides true) { content() }
         }
     }

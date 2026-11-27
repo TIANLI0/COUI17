@@ -3,7 +3,9 @@
 package io.github.suqi8.coui.kmp.basic
 
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -104,6 +106,8 @@ fun BasicComponent(
     interactionSource: MutableInteractionSource? = null,
     titleMaxLines: Int = Int.MAX_VALUE,
     summaryMaxLines: Int = Int.MAX_VALUE,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
 ) {
     // `COUICustomListSelectedLinearLayout` re-measures its icon once the title and summary have been
     // laid out, because both the icon's margins and its top offset depend on how many lines the text
@@ -134,6 +138,8 @@ fun BasicComponent(
             holdDownState = holdDownState,
             enabled = enabled,
             interactionSource = interactionSource,
+            onLongClick = onLongClick,
+            onLongClickLabel = onLongClickLabel,
         ) {
             if (title != null) {
                 Text(
@@ -187,6 +193,8 @@ fun BasicComponent(
     holdDownState: Boolean = false,
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
 ) {
     val titleGeometry = remember { mutableStateOf(TextLineGeometry()) }
     val summaryGeometry = remember(summary != null) { mutableStateOf(TextLineGeometry()) }
@@ -211,6 +219,8 @@ fun BasicComponent(
             holdDownState = holdDownState,
             enabled = enabled,
             interactionSource = interactionSource,
+            onLongClick = onLongClick,
+            onLongClickLabel = onLongClickLabel,
         ) {
             Text(
                 text = title,
@@ -317,18 +327,33 @@ fun BasicComponent(
     holdDownState: Boolean = false,
     enabled: Boolean = true,
     interactionSource: MutableInteractionSource? = null,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     @Suppress("NAME_SHADOWING")
     val interactionSource = interactionSource ?: remember { MutableInteractionSource() }
     val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    val indication = LocalIndication.current
 
     HoldDownObserver(holdDownState, interactionSource)
 
-    val clickableModifier = remember(enabled, onClick != null, interactionSource, role, onClickLabel) {
-        if (enabled && onClick != null) {
+    val clickableModifier = remember(enabled, onClick != null, onLongClick != null, interactionSource, indication, role, onClickLabel, onLongClickLabel) {
+        if (enabled && onLongClick != null) {
+            Modifier.combinedClickable(
+                interactionSource = interactionSource,
+                indication = indication,
+                onClickLabel = onClickLabel,
+                role = role,
+                onLongClickLabel = onLongClickLabel,
+                onLongClick = { currentOnLongClick?.invoke() },
+                onClick = { currentOnClick?.invoke() },
+            )
+        } else if (enabled && onClick != null) {
             Modifier.clickable(
                 interactionSource = interactionSource,
+                indication = indication,
                 onClickLabel = onClickLabel,
                 role = role,
                 onClick = { currentOnClick?.invoke() },

@@ -47,7 +47,9 @@ import io.github.suqi8.coui.kmp.overlay.OverlayListPopup
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.suqi8.coui.kmp.theme.LocalDismissState
 import io.github.suqi8.coui.kmp.window.WindowListPopup
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Internal shared layout logic for [OverlayListPopup] and [WindowListPopup].
@@ -93,6 +95,7 @@ internal fun ListPopupLayout(
     enableGlass: Boolean = false,
     staticBackdrop: ImageBitmap? = null,
     staticBackdropWindowSize: IntSize = IntSize.Zero,
+    backdropReady: () -> Boolean = { true },
     content: @Composable () -> Unit,
 ) {
     val fractionProgress = remember { Animatable(0f) }
@@ -103,6 +106,7 @@ internal fun ListPopupLayout(
     val windowAlpha = remember { Animatable(1f) }
     var windowExiting by remember { mutableStateOf(false) }
     val currentShow by rememberUpdatedState(show)
+    val currentBackdropReady by rememberUpdatedState(backdropReady)
     // Derived so the per-frame exit alpha only recomposes the host once, when it crosses over.
     // Handing touches back the moment the close starts, not when its fade is nearly over: the
     // close spring runs ~340ms and `windowExiting` only flips after it settles, so keying off the
@@ -130,6 +134,11 @@ internal fun ListPopupLayout(
             windowExiting = false
             windowAlpha.snapTo(1f)
             backProgress.snapTo(0f)
+            if (!currentBackdropReady()) {
+                withTimeoutOrNull(48L) {
+                    snapshotFlow { currentBackdropReady() }.first { it }
+                }
+            }
             // COUI runs three independent waves open (runOpenWaves): path t, scale and alpha.
             launch { pathProgress.animateTo(1f, ListPopupDefaults.PathEnterAnimationSpec) }
             launch { fractionProgress.animateTo(1f, ListPopupDefaults.FractionAnimationSpec) }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -66,6 +67,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.addOutline
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -108,15 +110,19 @@ import io.github.suqi8.coui.kmp.basic.InnerShadowStyle
 import io.github.suqi8.coui.kmp.basic.MaterialShadowEdgeDefaults
 import io.github.suqi8.coui.kmp.basic.MaterialStrokeParams
 import io.github.suqi8.coui.kmp.basic.PopupBarrierBoundary
+import io.github.suqi8.coui.kmp.basic.SpotLightDefaults
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.capsuleRimCornerWeight
 import io.github.suqi8.coui.kmp.basic.couiGlassSurface
+import io.github.suqi8.coui.kmp.basic.couiTouchMotion
 import io.github.suqi8.coui.kmp.basic.materialShadowEdge
 import io.github.suqi8.coui.kmp.basic.materialShadowEdgeBySize
+import io.github.suqi8.coui.kmp.basic.rememberCOUITouchMotionState
 import io.github.suqi8.coui.kmp.blur.BlendColorEntry
 import io.github.suqi8.coui.kmp.blur.BlurBlendMode
 import io.github.suqi8.coui.kmp.blur.BlurDefaults
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
+import io.github.suqi8.coui.kmp.blur.isBlurEnabled
 import io.github.suqi8.coui.kmp.shader.RuntimeShader
 import io.github.suqi8.coui.kmp.shader.asBrush
 import io.github.suqi8.coui.kmp.shader.isRuntimeShaderSupported
@@ -132,6 +138,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 
@@ -208,7 +215,9 @@ internal fun BottomSheetContentLayout(
     topScrollBlur: Boolean = true,
     topInset: Dp? = null,
     panelPaddingBottom: Dp = BottomSheetDefaults.PanelPaddingBottom,
+    headerBottomPadding: Dp = BottomSheetDefaults.PanelPaddingBottom,
     dismissOffsetFraction: Float = BottomSheetDefaults.DismissOffsetFraction,
+    backdropReady: () -> Boolean = { true },
     content: @Composable () -> Unit,
 ) {
     val animationProgress = remember { Animatable(0f, visibilityThreshold = 0.0001f) }
@@ -216,6 +225,7 @@ internal fun BottomSheetContentLayout(
     val dragOffsetY = remember { Animatable(0f) }
     val contentScrollOffsetPx = remember { mutableFloatStateOf(0f) }
     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
+    val currentBackdropReady by rememberUpdatedState(backdropReady)
     val internalVisible = remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
@@ -232,6 +242,11 @@ internal fun BottomSheetContentLayout(
             dimAlpha.floatValue = 1f
             contentScrollOffsetPx.floatValue = 0f
             val travelPx = snapshotFlow { sheetHeightPx.intValue }.first { it > 0 }.toFloat()
+            if (!currentBackdropReady()) {
+                withTimeoutOrNull(40L) {
+                    snapshotFlow { currentBackdropReady() }.first { it }
+                }
+            }
             animationProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = couiPanelSlideSpring(
@@ -409,6 +424,7 @@ internal fun BottomSheetContentLayout(
                 modifier = sheetModifier,
                 topInset = topInset,
                 panelPaddingBottom = panelPaddingBottom,
+                headerBottomPadding = headerBottomPadding,
                 dismissOffsetFraction = dismissOffsetFraction,
                 enableNestedScroll = enableNestedScroll,
                 allowTouches = show,
@@ -455,6 +471,7 @@ internal fun BottomSheetContent(
     contentScrollOffsetPx: MutableFloatState = remember { mutableFloatStateOf(0f) },
     topInset: Dp? = null,
     panelPaddingBottom: Dp = BottomSheetDefaults.PanelPaddingBottom,
+    headerBottomPadding: Dp = BottomSheetDefaults.PanelPaddingBottom,
     enableNestedScroll: Boolean = true,
     dismissOffsetFraction: Float = BottomSheetDefaults.DismissOffsetFraction,
     allowTouches: Boolean = true,
@@ -694,6 +711,7 @@ internal fun BottomSheetContent(
         windowHeight = windowHeight,
         topInset = calculatedTopInset,
         panelPaddingBottom = panelPaddingBottom,
+        headerBottomPadding = headerBottomPadding,
         sheetHeightPx = sheetHeightPx,
         dragOffsetY = dragOffsetY,
         contentScrollOffsetPx = contentScrollOffsetPx,
@@ -731,6 +749,7 @@ private fun BottomSheetColumn(
     windowHeight: Dp,
     topInset: Dp,
     panelPaddingBottom: Dp,
+    headerBottomPadding: Dp,
     sheetHeightPx: MutableIntState,
     dragOffsetY: Animatable<Float, *>,
     contentScrollOffsetPx: MutableFloatState,
@@ -782,6 +801,16 @@ private fun BottomSheetColumn(
     val topScrollAlpha: () -> Float = remember(density, contentScrollOffsetPx) {
         { AppBarBlurOverlayDefaults.scrollAlpha(contentScrollOffsetPx.floatValue, density) }
     }
+    val pullUpLimit = if (enablePullUp) {
+        pullUpLimitPx(
+            windowHeightPx = with(density) { windowHeight.toPx() },
+            sheetHeightPx = sheetHeightPx.intValue.toFloat(),
+            density = density,
+        )
+    } else {
+        0f
+    }
+    val handlePressAlpha = remember { Animatable(0f) }
 
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -799,6 +828,39 @@ private fun BottomSheetColumn(
                 .then(
                     if (allowTouches) {
                         Modifier.pointerInput(Unit) { detectTapGestures { /* Consume click */ } }
+                    } else {
+                        Modifier
+                    },
+                )
+                // COUIBottomSheetBehavior defaults `mGlobalDrag = true`: any non-scrolling area of
+                // the panel (the toolbar, a close capsule dragged vertically past slop, or a short
+                // body with no scroll container) drags the sheet, while child scrollables still claim
+                // vertical scroll first and hand overscroll to `nestedScrollConnection`.
+                .then(
+                    if (draggable && allowTouches) {
+                        Modifier.draggable(
+                            orientation = Orientation.Vertical,
+                            state = rememberDraggableState { dragAmount ->
+                                val newOffset = dragOffsetY.value + dragAmount
+                                val finalOffset = if (newOffset < 0) {
+                                    (dragOffsetY.value + dragAmount * PULL_UP_FRICTION).coerceIn(-pullUpLimit, 0f)
+                                } else if (newOffset >= 0 && !allowDismiss) {
+                                    val dampedAmount = if (dragAmount > 0) dragAmount * 0.1f else dragAmount
+                                    (dragOffsetY.value + dampedAmount).coerceAtLeast(0f)
+                                } else {
+                                    newOffset
+                                }
+                                dragSnapChannel.trySend(finalOffset)
+                                onUpdateAlpha(finalOffset)
+                            },
+                            onDragStarted = {
+                                if (showDragHandle) coroutineScope.animateHandlePressDown(handlePressAlpha)
+                            },
+                            onDragStopped = { velocity ->
+                                if (showDragHandle) coroutineScope.animateHandlePressRelease(handlePressAlpha)
+                                onSettle(velocity)
+                            },
+                        )
                     } else {
                         Modifier
                     },
@@ -841,30 +903,18 @@ private fun BottomSheetColumn(
                 .padding(horizontal = insideMargin.width)
                 .padding(
                     // An extra foot gap only exists while the keyboard is away; above the IME it
-                    // would read as dead space, so it is dropped.
+                    // would read as dead space, so it is dropped when the panel tracks the IME.
                     bottom = insideMargin.height +
-                        if (imeInsets.getBottom(density) > 0) 0.dp else panelPaddingBottom,
+                        if (defaultWindowInsetsPadding && imeInsets.getBottom(density) > 0) 0.dp else panelPaddingBottom,
                 ),
         ) {
             DragHandleArea(
                 dragHandleColor = dragHandleColor,
                 showDragHandle = showDragHandle,
-                allowDismiss = allowDismiss,
                 draggable = draggable,
-                pullUpLimitPx = if (enablePullUp) {
-                    pullUpLimitPx(
-                        windowHeightPx = with(density) { windowHeight.toPx() },
-                        sheetHeightPx = sheetHeightPx.intValue.toFloat(),
-                        density = density,
-                    )
-                } else {
-                    0f
-                },
-                dragOffsetY = dragOffsetY,
+                pressAlpha = handlePressAlpha,
                 coroutineScope = coroutineScope,
-                dragSnapChannel = dragSnapChannel,
-                onSettle = onSettle,
-                onUpdateAlpha = onUpdateAlpha,
+                headerBottomPadding = headerBottomPadding,
             ) {
                 if (title != null || subtitle != null || startAction != null || endAction != null) {
                     TitleAndActionsRow(
@@ -1087,17 +1137,12 @@ private val HiddenHandleStripHeight = 10.dp
 private fun DragHandleArea(
     dragHandleColor: Color,
     showDragHandle: Boolean,
-    allowDismiss: Boolean,
     draggable: Boolean,
-    pullUpLimitPx: Float,
-    dragOffsetY: Animatable<Float, *>,
+    pressAlpha: Animatable<Float, *>,
     coroutineScope: CoroutineScope,
-    dragSnapChannel: Channel<Float>,
-    onSettle: (velocity: Float) -> Unit,
-    onUpdateAlpha: (Float) -> Unit,
+    headerBottomPadding: Dp = 0.dp,
     toolbar: @Composable () -> Unit,
 ) {
-    val pressAlpha = remember { Animatable(0f) }
     val squircleEnabled = isSquircleEnabled()
     val handleShape = remember(squircleEnabled) { CapsuleOutlineShape(squircleEnabled = squircleEnabled) }
     val pressShape = remember(squircleEnabled) { SquircleShape(16.dp, squircleEnabled = squircleEnabled) }
@@ -1111,42 +1156,7 @@ private fun DragHandleArea(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (showDragHandle && draggable) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-            .then(
-                if (draggable) {
-                    Modifier
-                        .draggable(
-                            orientation = Orientation.Vertical,
-                            state = rememberDraggableState { dragAmount ->
-                                val newOffset = dragOffsetY.value + dragAmount
-                                val finalOffset = if (newOffset < 0) {
-                                    // COUIBottomSheetDialog's pull-up listener drags the parent padding by 0.2
-                                    // of the pull, clamped to `coui_panel_pull_up_max_offset` and the panel top.
-                                    (dragOffsetY.value + dragAmount * PULL_UP_FRICTION).coerceIn(-pullUpLimitPx, 0f)
-                                } else if (newOffset >= 0 && !allowDismiss) {
-                                    // Damping down if not dismissible
-                                    val dampedAmount = if (dragAmount > 0) dragAmount * 0.1f else dragAmount
-                                    (dragOffsetY.value + dampedAmount).coerceAtLeast(0f)
-                                } else {
-                                    newOffset
-                                }
-
-                                dragSnapChannel.trySend(finalOffset)
-                                onUpdateAlpha(finalOffset)
-                            },
-                            onDragStarted = {
-                                coroutineScope.animateHandlePressDown(pressAlpha)
-                            },
-                            onDragStopped = { velocity ->
-                                coroutineScope.animateHandlePressRelease(pressAlpha)
-                                // Delegate the settle logic to the shared function
-                                onSettle(velocity)
-                            },
-                        )
-                } else {
-                    Modifier
-                },
-            )
+            .then(if (showDragHandle && draggable) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
     ) {
         Box(
             modifier = Modifier
@@ -1190,6 +1200,9 @@ private fun DragHandleArea(
             }
         }
         toolbar()
+        if (headerBottomPadding > 0.dp) {
+            Spacer(Modifier.height(headerBottomPadding))
+        }
     }
 }
 
@@ -1503,13 +1516,35 @@ object BottomSheetDefaults {
     val TitleBottomGap = 12.dp
 
     /**
-     * The toolbar button rim: `MaterialStrokeParams(edgeAlpha = 0.5f, edgeWidth = 2.dp, shadowFadeIn = 0.03f)`.
+     * Legacy toolbar button rim constant; prefer [toolbarButtonStroke], which resolves ColorOS 17's
+     * `FRAMEWORK_CAPSULE_PARAMS_8` / `FRAMEWORK_CIRCLE_PARAMS_4` by theme.
      */
     val ToolbarButtonStroke: MaterialStrokeParams = MaterialStrokeParams(
         edgeAlpha = 0.5f,
         edgeWidth = 2.dp,
         shadowFadeIn = 0.03f,
     )
+
+    /**
+     * `ToolbarMaterialEffectDelegate.applyBlurWindowBackground` (`mIsDrawableMaterialEffect = true`):
+     * `FRAMEWORK_CAPSULE_PARAMS_8` / `FRAMEWORK_CIRCLE_PARAMS_4` — `0.8f / 1.8dp / fadeIn 0.1f / fadeOut 0f`
+     * in light mode and `0.15f / 1.8dp / fadeIn 0.01f / fadeOut 0f` in dark mode.
+     */
+    fun toolbarButtonStroke(isDark: Boolean): MaterialStrokeParams = if (isDark) {
+        MaterialStrokeParams(
+            edgeAlpha = 0.15f,
+            edgeWidth = 1.8.dp,
+            shadowFadeIn = 0.01f,
+            shadowFadeOut = 0f,
+        )
+    } else {
+        MaterialStrokeParams(
+            edgeAlpha = 0.8f,
+            edgeWidth = 1.8.dp,
+            shadowFadeIn = 0.1f,
+            shadowFadeOut = 0f,
+        )
+    }
 
     /**
      * The visible padding the panel adds under its content, on top of [insideMargin]: none.
@@ -1620,6 +1655,7 @@ fun SheetActionButton(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        isCapsule = false,
     ) {
         Box(
             modifier = Modifier.size(BottomSheetDefaults.ActionButtonSize),
@@ -1656,6 +1692,7 @@ fun SheetCloseCapsule(
         onClick = onClick,
         modifier = modifier,
         enabled = enabled,
+        isCapsule = true,
     ) {
         Box(
             modifier = Modifier
@@ -1676,106 +1713,157 @@ fun SheetCloseCapsule(
     }
 }
 
+/** `COUIMaskEffectDrawable`: quick taps reach 70% press wash before fading out. */
+private const val TOOLBAR_BUTTON_MIN_WASH_PROGRESS = 0.7f
+
+private class ToolbarButtonWashThresholdReached : CancellationException()
+
 /**
- * The toolbar button surface shared by [SheetActionButton] and [SheetCloseCapsule], with the
- * ColorOS 17 panel button dress: circular/capsule press wash, material stroke rim, and dithered
- * halo shadow.
+ * The toolbar button surface shared by [SheetActionButton] and [SheetCloseCapsule], aligned with
+ * ColorOS 17's `ToolbarMaterialEffectDelegate` (`setIsDrawableMaterialEffect(true)` in
+ * `COUIPanelFragment`):
+ * - `BLUR_WINDOW_VIEW_BG_COLOR_DARK` (`#333333`) / `_LIGHT` (`#F0F0F0`) on blurred panels, and
+ *   `PANEL_FALLBACK_OVERLAY_COLOR_DARK` (`#33FFFFFF`) / `_LIGHT` (`#1A000000`) over
+ *   `couiColorSurfaceWithCard` when blur is disabled;
+ * - `FRAMEWORK_CAPSULE_PARAMS_8` (`EDGE_STYLE_0` / `SHADOW_STYLE_0`) for capsules and
+ *   `FRAMEWORK_CIRCLE_PARAMS_4` (`EDGE_STYLE_1` / `SHADOW_STYLE_1`) for circular buttons;
+ * - `COUIViewTouchAnimator` (`deformation + rubber + pressScale`) with
+ *   `COUISpotLightEffect.TYPE_OPAQUE_SMALL_2`, leaving vertical drags unconsumed so dragging past
+ *   touch slop still pulls the panel itself.
  */
 @Composable
 internal fun SheetToolbarButtonSurface(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    isCapsule: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
-    val fill = if (isDark) Color(0x20FFFFFF) else Color.Transparent
-    val halo = if (isDark) {
-        Shadow(
-            radius = 16.dp,
-            color = Color.White,
-            offset = DpOffset(0.dp, 6.dp),
-            alpha = 0.05f,
-        )
+    val blurActive = isBlurEnabled() && LocalBackdrop.current != null
+    val fill = if (blurActive) {
+        if (isDark) Color(0xFF333333) else Color(0xFFF0F0F0)
     } else {
-        Shadow(
-            radius = 16.dp,
-            color = Color.Black,
-            offset = DpOffset(0.dp, 6.dp),
-            alpha = 0.12f,
-        )
+        val overlay = if (isDark) Color(0x33FFFFFF) else Color(0x1A000000)
+        overlay.compositeOver(COUITheme.colorScheme.surfaceContainer)
     }
     val squircleEnabled = isSquircleEnabled()
-    val capsuleShape = remember(squircleEnabled) { CapsuleOutlineShape(squircleEnabled = squircleEnabled) }
-    val haloShader = rememberToolbarHaloShader()
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val wash = remember { Animatable(0f) }
-    LaunchedEffect(pressed) {
-        wash.animateTo(
-            targetValue = if (pressed) 1f else 0f,
-            animationSpec = folmeSpring(damping = 1f, response = 0.3f),
-        )
+    val buttonShape = remember(isCapsule, squircleEnabled) {
+        if (isCapsule) CapsuleOutlineShape(squircleEnabled = squircleEnabled) else CircleShape
     }
+    val haloShader = rememberToolbarHaloShader()
+    val touchMotion = rememberCOUITouchMotionState()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressedFromInteraction by interactionSource.collectIsPressedAsState()
+    val pressed = enabled && (isPressedFromInteraction || touchMotion.values.value.pressed)
+    val wash = remember { Animatable(0f) }
+    LaunchedEffect(enabled, pressed) {
+        val springSpec = folmeSpring<Float>(damping = 1f, response = 0.3f)
+        if (!enabled) {
+            wash.snapTo(0f)
+        } else if (pressed) {
+            wash.animateTo(1f, springSpec)
+        } else if (wash.value > 0f) {
+            if (wash.value < TOOLBAR_BUTTON_MIN_WASH_PROGRESS) {
+                try {
+                    wash.animateTo(1f, springSpec) {
+                        if (value >= TOOLBAR_BUTTON_MIN_WASH_PROGRESS) throw ToolbarButtonWashThresholdReached()
+                    }
+                } catch (_: ToolbarButtonWashThresholdReached) {
+                    // Reached minimum visible flash; proceed to fade-out.
+                }
+            }
+            wash.animateTo(0f, springSpec)
+        }
+    }
+    val pressFraction = wash.value.coerceIn(0f, 1f)
+    val haloAlpha = (if (isDark) 0.05f else 0.06f) * (1f - pressFraction)
+    val halo = Shadow(
+        radius = 12.dp,
+        color = if (isDark) Color.White else Color.Black,
+        offset = DpOffset(0.dp, 4.dp),
+        alpha = haloAlpha,
+    )
     val pressColor = BottomSheetDefaults.actionButtonPressColor()
+    val baseStroke = BottomSheetDefaults.toolbarButtonStroke(isDark)
+    val stroke = baseStroke.copy(edgeAlpha = baseStroke.edgeAlpha * (1f - pressFraction))
     val currentOnClick by rememberUpdatedState(onClick)
 
-    Box(modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .then(
-                    if (haloShader != null) {
-                        Modifier.ditheredHalo(haloShader, halo, continuousCurve = squircleEnabled)
-                    } else {
-                        Modifier
-                            .drawWithContent {
-                                val capsule = Path().apply {
-                                    addOutline(capsuleShape.createOutline(size, layoutDirection, this@drawWithContent))
-                                }
-                                clipPath(capsule, ClipOp.Difference) { this@drawWithContent.drawContent() }
+    val surfaceChain = Modifier
+        .then(
+            if (haloAlpha > 0f) {
+                if (haloShader != null) {
+                    Modifier.ditheredHalo(haloShader, halo, continuousCurve = isCapsule && squircleEnabled)
+                } else {
+                    Modifier
+                        .drawWithContent {
+                            val outlinePath = Path().apply {
+                                addOutline(buttonShape.createOutline(size, layoutDirection, this@drawWithContent))
                             }
-                            .dropShadow(capsuleShape, halo)
-                    },
-                ),
-        )
-        Box(
-            modifier = Modifier
-                .clip(capsuleShape)
-                .background(fill)
-                .drawBehind {
-                    if (wash.value > 0f) {
-                        drawRect(color = pressColor.copy(alpha = pressColor.alpha * wash.value))
-                    }
+                            clipPath(outlinePath, ClipOp.Difference) { this@drawWithContent.drawContent() }
+                            this@drawWithContent.drawContent()
+                        }
+                        .dropShadow(buttonShape, halo)
                 }
-                .materialShadowEdgeBySize(
-                    stroke = BottomSheetDefaults.ToolbarButtonStroke,
+            } else {
+                Modifier
+            },
+        )
+        .clip(buttonShape)
+        .background(fill)
+        .drawBehind {
+            if (pressFraction > 0f) {
+                drawRect(color = pressColor.copy(alpha = pressColor.alpha * pressFraction))
+            }
+        }
+        .then(
+            if (blurActive) {
+                Modifier.materialShadowEdgeBySize(
+                    stroke = stroke,
                     cornerWeightFor = { width, height ->
-                        if (squircleEnabled) {
+                        if (!isCapsule) {
+                            2f
+                        } else if (squircleEnabled) {
                             capsuleRimCornerWeight(width, height, height / 2f, squircleEnabled = true)
                         } else {
                             MaterialShadowEdgeDefaults.CapsuleCornerWeight
                         }
                     },
-                    edgeStyle = GradientStrokeStyle.EDGE_STYLE_1,
-                    shadowStyle = InnerShadowStyle.SHADOW_STYLE_1,
+                    edgeStyle = if (isCapsule) GradientStrokeStyle.EDGE_STYLE_0 else GradientStrokeStyle.EDGE_STYLE_1,
+                    shadowStyle = if (isCapsule) InnerShadowStyle.SHADOW_STYLE_0 else InnerShadowStyle.SHADOW_STYLE_1,
                 )
-                .then(
-                    if (enabled) {
-                        Modifier.clickable(
-                            role = Role.Button,
-                            interactionSource = interactionSource,
-                            indication = null,
-                            onClick = { currentOnClick() },
-                        )
-                    } else {
-                        Modifier
-                    },
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            content()
-        }
+            } else {
+                Modifier
+            },
+        )
+
+    Box(
+        modifier = modifier
+            .couiTouchMotion(
+                enabled = enabled,
+                motionState = touchMotion,
+                pressScaleEnabled = true,
+                consumeDrag = false,
+                shape = buttonShape,
+                lightParams = SpotLightDefaults.opaqueSmall2(isDark),
+                lightEnabled = enabled,
+                surface = surfaceChain,
+            )
+            .then(
+                if (enabled) {
+                    Modifier.clickable(
+                        role = Role.Button,
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { currentOnClick() },
+                    )
+                } else {
+                    Modifier
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
     }
 }
 
