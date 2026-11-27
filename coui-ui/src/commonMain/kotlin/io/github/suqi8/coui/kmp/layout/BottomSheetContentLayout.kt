@@ -52,6 +52,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
@@ -225,12 +226,12 @@ internal fun BottomSheetContentLayout(
         // with a one-shot read (no recomposition subscription).
         val containerPx = windowInfo.containerSize.height.toFloat()
         val peekPx = with(density) { PanelPeekHeight.toPx() }
-        val travelPx = sheetHeightPx.intValue.takeIf { it > 0 }?.toFloat() ?: containerPx
         if (show) {
             internalVisible.value = true
             dragOffsetY.snapTo(0f)
             dimAlpha.floatValue = 1f
             contentScrollOffsetPx.floatValue = 0f
+            val travelPx = snapshotFlow { sheetHeightPx.intValue }.first { it > 0 }.toFloat()
             animationProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = couiPanelSlideSpring(
@@ -246,6 +247,7 @@ internal fun BottomSheetContentLayout(
                 // Sheet already dragged off-screen — snap immediately
                 animationProgress.snapTo(0f)
             } else {
+                val travelPx = sheetHeightPx.intValue.takeIf { it > 0 }?.toFloat() ?: containerPx
                 // Button/back dismiss — animate normally
                 animationProgress.animateTo(
                     targetValue = 0f,
@@ -375,10 +377,7 @@ internal fun BottomSheetContentLayout(
         ) {
             val sheetModifier = modifier.graphicsLayer {
                 val progress = animationProgress.value
-                val currentHeight = sheetHeightPx.intValue.toFloat()
-                val windowHeightPx = windowInfo.containerSize.height.toFloat()
-                val baseOffset = if (currentHeight > 0) currentHeight else windowHeightPx
-                translationY = baseOffset * (1f - progress) + dragOffsetY.value
+                translationY = size.height * (1f - progress) + dragOffsetY.value
             }
 
             BottomSheetContent(
@@ -866,15 +865,15 @@ private fun BottomSheetColumn(
                 dragSnapChannel = dragSnapChannel,
                 onSettle = onSettle,
                 onUpdateAlpha = onUpdateAlpha,
-            )
-
-            if (title != null || subtitle != null || startAction != null || endAction != null) {
-                TitleAndActionsRow(
-                    title = title,
-                    subtitle = subtitle,
-                    startAction = startAction,
-                    endAction = endAction,
-                )
+            ) {
+                if (title != null || subtitle != null || startAction != null || endAction != null) {
+                    TitleAndActionsRow(
+                        title = title,
+                        subtitle = subtitle,
+                        startAction = startAction,
+                        endAction = endAction,
+                    )
+                }
             }
 
             BottomSheetScrollableBody(
@@ -921,7 +920,7 @@ internal fun BottomSheetScrollableBody(
     content: @Composable () -> Unit,
 ) {
     Column(
-        modifier = modifier.then(
+        modifier = modifier.clipToBounds().then(
             if (topScrollBlur) {
                 Modifier.bottomSheetTopFadeEdge(
                     scrollFraction = scrollFraction,
@@ -1096,6 +1095,7 @@ private fun DragHandleArea(
     dragSnapChannel: Channel<Float>,
     onSettle: (velocity: Float) -> Unit,
     onUpdateAlpha: (Float) -> Unit,
+    toolbar: @Composable () -> Unit,
 ) {
     val pressAlpha = remember { Animatable(0f) }
     val squircleEnabled = isSquircleEnabled()
@@ -1108,25 +1108,13 @@ private fun DragHandleArea(
     // row keeps the same offset from the panel edge as a handled panel.
     val stripHeight = if (showDragHandle) 24.dp else HiddenHandleStripHeight
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(stripHeight)
             .then(if (showDragHandle && draggable) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
             .then(
                 if (draggable) {
                     Modifier
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onPress = {
-                                    coroutineScope.animateHandlePressDown(pressAlpha)
-                                    val released = tryAwaitRelease()
-                                    if (released) {
-                                        coroutineScope.animateHandlePressRelease(pressAlpha)
-                                    }
-                                },
-                            )
-                        }
                         .draggable(
                             orientation = Orientation.Vertical,
                             state = rememberDraggableState { dragAmount ->
@@ -1159,32 +1147,49 @@ private fun DragHandleArea(
                     Modifier
                 },
             )
-            // COUI coui_panel_drag_view_shadow_margin_top: aligns the band center with the bar center.
-            .padding(top = if (showDragHandle) 4.dp else 0.dp),
-        contentAlignment = Alignment.Center,
     ) {
-        if (showDragHandle) {
-            // COUI press feedback background, faded in/out while the handle is touched.
-            Box(
-                modifier = Modifier
-                    .width(70.dp)
-                    .height(20.dp)
-                    .clip(pressShape)
-                    .drawBehind {
-                        drawRect(pressColor.copy(alpha = pressColor.alpha * pressAlpha.value))
-                    },
-            )
-            // COUI drag bar: a fixed continuous-curve capsule, no press deformation.
-            Box(
-                modifier = Modifier
-                    .width(36.dp)
-                    .height(4.dp)
-                    .clip(handleShape)
-                    .drawBehind {
-                        drawRect(dragHandleColor)
-                    },
-            )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(stripHeight)
+                .then(
+                    if (showDragHandle && draggable) {
+                        Modifier.pointerInput(Unit) {
+                            detectTapGestures(onPress = {
+                                coroutineScope.animateHandlePressDown(pressAlpha)
+                                tryAwaitRelease()
+                                coroutineScope.animateHandlePressRelease(pressAlpha)
+                            })
+                        }
+                    } else Modifier,
+                )
+                .padding(top = if (showDragHandle) 4.dp else 0.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (showDragHandle) {
+                // COUI press feedback background, faded in/out while the handle is touched.
+                Box(
+                    modifier = Modifier
+                        .width(70.dp)
+                        .height(20.dp)
+                        .clip(pressShape)
+                        .drawBehind {
+                            drawRect(pressColor.copy(alpha = pressColor.alpha * pressAlpha.value))
+                        },
+                )
+                // COUI drag bar: a fixed continuous-curve capsule, no press deformation.
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(handleShape)
+                        .drawBehind {
+                            drawRect(dragHandleColor)
+                        },
+                )
+            }
         }
+        toolbar()
     }
 }
 

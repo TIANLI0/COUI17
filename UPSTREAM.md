@@ -233,6 +233,11 @@ action spacing and rail geometry, labels, and state colors with COUI17 resources
 Close the floating search bar through the same cancellation callback for the button and system
 back. Apply the trailing capsule's slide in pixel coordinates.
 
+### 0024 — sheet toolbar and popup transitions
+
+Keep the scroll fade inside the sheet body. Let the toolbar share the handle's drag gesture, and
+measure the panel before revealing it. Hold a point-anchored menu in place during its exit.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on

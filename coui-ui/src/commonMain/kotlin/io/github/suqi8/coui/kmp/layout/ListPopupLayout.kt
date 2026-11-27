@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -120,6 +121,8 @@ internal fun ListPopupLayout(
     val internalVisible = remember { mutableStateOf(false) }
     var popupContentSize by remember { mutableStateOf(IntSize.Zero) }
     var hostPositionInWindow by remember { mutableStateOf(Offset.Zero) }
+    var frozenTouchAnchor by remember { mutableStateOf<Offset?>(null) }
+    var needsTouchAnchor by remember(show) { mutableStateOf(show) }
 
     LaunchedEffect(show) {
         if (show) {
@@ -158,6 +161,7 @@ internal fun ListPopupLayout(
             dimProgress.snapTo(0f)
             backProgress.snapTo(0f)
             internalVisible.value = false
+            frozenTouchAnchor = null
             currentOnDismissFinished?.invoke()
         }
     }
@@ -186,7 +190,15 @@ internal fun ListPopupLayout(
     // COUI PopupMenuLocateHelper.setAnchor collapses the anchor to the recorded touch point, so both
     // the horizontal centring and the below/above test run against that point. The point is already
     // in window coordinates, the same space parentBounds uses.
-    val touchPoint = preciseClickState?.touchPoint ?: Offset.Unspecified
+    val liveTouchPoint = preciseClickState?.touchPoint ?: Offset.Unspecified
+    val touchPoint = if (needsTouchAnchor) liveTouchPoint else frozenTouchAnchor ?: liveTouchPoint
+    // Once the menu is open, a new down on the uncovered page must not move the closing menu.
+    if (needsTouchAnchor && preciseClickState != null) {
+        SideEffect {
+            frozenTouchAnchor = touchPoint
+            needsTouchAnchor = false
+        }
+    }
     val anchorBounds = if (touchPoint.isSpecified) {
         val x = touchPoint.x.toInt()
         val y = touchPoint.y.toInt()
