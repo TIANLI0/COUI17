@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -89,7 +91,7 @@ fun NavigationRail(
                 .width(minWidth)
                 .fillMaxHeight()
                 .verticalScroll(rememberScrollState())
-                .padding(vertical = NavigationRailDefaults.VerticalPadding),
+                .padding(top = NavigationRailDefaults.TopPadding, bottom = NavigationRailDefaults.BottomPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top,
         ) {
@@ -129,23 +131,27 @@ fun NavigationRailItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val onSurfaceContainerColor = COUITheme.colorScheme.onSurfaceContainer
+    // COUI's icon and label color selectors resolve disabled, pressed, selected, then idle.
+    val scheme = COUITheme.colorScheme
     val tint = when {
-        isPressed -> if (selected) {
-            onSurfaceContainerColor.copy(alpha = NavigationRailDefaults.SelectedPressedAlpha)
-        } else {
-            onSurfaceContainerColor.copy(alpha = NavigationRailDefaults.UnselectedPressedAlpha)
-        }
-
-        selected -> onSurfaceContainerColor
-
-        else -> onSurfaceContainerColor.copy(NavigationRailDefaults.UnselectedAlpha)
+        !enabled -> scheme.disabledOnSurface
+        isPressed -> scheme.onSurface
+        selected -> scheme.onSurface
+        else -> scheme.onSurfaceSecondary
     }
-    val fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
     val mode = LocalNavigationRailDisplayMode.current
+    val showIcon = mode != NavigationRailDisplayMode.TextOnly
+    val showLabel = when (mode) {
+        NavigationRailDisplayMode.IconOnly -> false
+        NavigationRailDisplayMode.IconWithSelectedLabel -> selected
+        else -> true
+    }
+    val textOnly = mode == NavigationRailDisplayMode.TextOnly
 
     Column(
         modifier = modifier
+            .padding(horizontal = NavigationRailDefaults.ItemMarginHorizontal)
+            .widthIn(max = NavigationRailDefaults.ItemWidth)
             .fillMaxWidth()
             .selectable(
                 selected = selected,
@@ -160,62 +166,28 @@ fun NavigationRailItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        when (mode) {
-            NavigationRailDisplayMode.IconAndText -> {
-                Image(
-                    modifier = Modifier.size(NavigationRailDefaults.IconSize),
-                    imageVector = icon,
-                    contentDescription = label,
-                    colorFilter = ColorFilter.tint(tint),
-                )
-                Spacer(modifier = Modifier.height(NavigationRailDefaults.IconTextSpacing))
-                Text(
-                    text = label,
-                    color = tint,
-                    textAlign = TextAlign.Center,
-                    fontSize = NavigationRailDefaults.LabelFontSize,
-                    fontWeight = fontWeight,
-                )
-            }
-
-            NavigationRailDisplayMode.IconWithSelectedLabel -> {
-                Image(
-                    modifier = Modifier.size(NavigationRailDefaults.IconSize),
-                    imageVector = icon,
-                    contentDescription = label,
-                    colorFilter = ColorFilter.tint(tint),
-                )
-                if (selected) {
-                    Spacer(modifier = Modifier.height(NavigationRailDefaults.IconTextSpacing))
-                    Text(
-                        text = label,
-                        color = tint,
-                        textAlign = TextAlign.Center,
-                        fontSize = NavigationRailDefaults.LabelFontSize,
-                        fontWeight = fontWeight,
-                    )
-                }
-            }
-
-            NavigationRailDisplayMode.TextOnly -> {
-                Text(
-                    modifier = Modifier.padding(vertical = NavigationRailDefaults.TextOnlyVerticalPadding),
-                    text = label,
-                    color = tint,
-                    textAlign = TextAlign.Center,
-                    fontSize = NavigationRailDefaults.TextOnlyFontSize,
-                    fontWeight = fontWeight,
-                )
-            }
-
-            else -> {
-                Image(
-                    modifier = Modifier.size(NavigationRailDefaults.IconSize),
-                    imageVector = icon,
-                    contentDescription = label,
-                    colorFilter = ColorFilter.tint(tint),
-                )
-            }
+        if (showIcon) {
+            Image(
+                modifier = Modifier.size(NavigationRailDefaults.IconSize),
+                imageVector = icon,
+                contentDescription = if (showLabel) null else label,
+                colorFilter = ColorFilter.tint(tint),
+            )
+        }
+        if (showIcon && showLabel) {
+            Spacer(modifier = Modifier.height(NavigationRailDefaults.IconTextSpacing))
+        }
+        if (showLabel) {
+            Text(
+                modifier = if (textOnly) Modifier.padding(vertical = NavigationRailDefaults.TextOnlyVerticalPadding) else Modifier,
+                text = label,
+                color = tint,
+                textAlign = TextAlign.Center,
+                fontSize = if (textOnly) NavigationRailDefaults.TextOnlyFontSize else NavigationRailDefaults.LabelFontSize,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -225,8 +197,13 @@ object NavigationRailDefaults {
     /** The default minimum width of the [NavigationRail] (COUI coui_navigation_rail_min_width). */
     val MinWidth = 72.dp
 
-    /** The default vertical padding of the [NavigationRail] content. */
+    /** The original symmetric padding, retained for callers that share it across layouts. */
     val VerticalPadding = 24.dp
+
+    internal val TopPadding = 4.dp
+    internal val BottomPadding = 16.dp
+    internal val ItemWidth = 64.dp
+    internal val ItemMarginHorizontal = 4.dp
 
     /** The default spacing after the header. */
     val HeaderSpacing = 24.dp
@@ -249,13 +226,13 @@ object NavigationRailDefaults {
     /** The vertical padding in [NavigationRailDisplayMode.TextOnly] mode. */
     val TextOnlyVerticalPadding = 4.dp
 
-    /** The alpha value for the selected item when pressed. */
+    /** The original pressed alpha for selected items, retained for custom rail content. */
     val SelectedPressedAlpha = 0.5f
 
-    /** The alpha value for an unselected item when pressed. */
+    /** The original pressed alpha for unselected items, retained for custom rail content. */
     val UnselectedPressedAlpha = 0.6f
 
-    /** The alpha value for an unselected item. */
+    /** The original unselected alpha, retained for custom rail content. */
     val UnselectedAlpha = 0.4f
 }
 

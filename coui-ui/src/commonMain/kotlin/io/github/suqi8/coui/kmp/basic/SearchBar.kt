@@ -5,6 +5,7 @@ package io.github.suqi8.coui.kmp.basic
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -64,6 +65,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
@@ -95,6 +97,7 @@ import io.github.suqi8.coui.kmp.kit.topappbar.LocalCouiToolbarBackdrop
 import io.github.suqi8.coui.kmp.squircle.isSquircleEnabled
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.suqi8.coui.kmp.theme.LocalContentColor
+import io.github.suqi8.coui.kmp.utils.COUIResponsiveUtils
 import io.github.suqi8.coui.kmp.utils.hasFocusReassignBug
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -125,7 +128,16 @@ fun SearchBar(
 ) {
     val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
     val navigationEventState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
-    val actionSlideDistancePx = with(LocalDensity.current) { ActionSlideDistance.roundToPx() }
+    val layoutDirection = LocalLayoutDirection.current
+    val slideDirection = if (layoutDirection == LayoutDirection.Rtl) -1 else 1
+    val actionSlideDistancePx = with(LocalDensity.current) { slideDirection * ActionSlideDistance.roundToPx() }
+    val windowClass = COUIResponsiveUtils.windowSizeClass(LocalWindowInfo.current.containerDpSize.width)
+    val actionEndPadding = COUIResponsiveUtils.pick(windowClass, 4.dp, 12.dp, 28.dp)
+    val fieldEndPadding by animateDpAsState(
+        targetValue = if (expanded && outsideEndAction != null) 0.dp else insideMargin.width,
+        animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase),
+        label = "search field end padding",
+    )
     Column(
         modifier = modifier,
     ) {
@@ -136,7 +148,12 @@ fun SearchBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(vertical = insideMargin.height, horizontal = insideMargin.width),
+                    .padding(
+                        start = insideMargin.width,
+                        end = fieldEndPadding,
+                        top = insideMargin.height,
+                        bottom = insideMargin.height,
+                    ),
             ) {
                 inputField()
             }
@@ -162,8 +179,8 @@ fun SearchBar(
                 ) {
                     Box(
                         modifier = Modifier.padding(
-                            start = ActionExtraStartPadding,
-                            end = ActionEndPadding,
+                            start = SearchBarActionButtonDefaults.StartGap,
+                            end = actionEndPadding,
                         ),
                     ) {
                         endAction()
@@ -1223,8 +1240,6 @@ private val BackgroundResizeDurationMillis = 450
 private val ActionOffsetDurationMillis = 400
 private val ActionAlphaDurationMillis = 350
 private val ActionSlideDistance = 60.dp
-private val ActionExtraStartPadding = 4.dp
-private val ActionEndPadding = 16.dp
 
 @Composable
 internal fun SearchBarCausticGlow(color: Color, modifier: Modifier = Modifier) {

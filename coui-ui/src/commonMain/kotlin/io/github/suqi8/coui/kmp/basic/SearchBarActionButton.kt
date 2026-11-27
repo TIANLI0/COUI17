@@ -238,8 +238,8 @@ object SearchBarActionButtonDefaults {
     /** The horizontal label inset, COUI `coui_search_bar_functional_button_text_padding_horizontal`. */
     val HorizontalPadding = 16.dp
 
-    /** The gap before the capsule, COUI `coui_search_bar_functional_button_start_gap` (12dp). */
-    val StartGap = 12.dp
+    /** The gap before the capsule, COUI `coui_search_bar_functional_button_start_gap` (10dp). */
+    val StartGap = 10.dp
 
     /**
      * The label colour, COUI `coui_searchview_cancel_button_color` / `uk_black_ninety_percent`:

@@ -5,10 +5,12 @@ Lists every public top-level ``@Composable`` function whose name starts with an
 upper-case letter, grouped by module and package. Run after an upstream sync:
 
     python -I tools/gen_component_catalog.py
+    python -I tools/gen_component_catalog.py --gallery-coverage
 """
 
 from __future__ import annotations
 
+import argparse
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -42,9 +44,31 @@ COMPOSABLE = re.compile(
 MODIFIER = re.compile(
     r"@Composable\s*(?:(public|internal|private)\s+)?fun\s+Modifier\.(\w+)\s*\(",
 )
+KOTLIN_IMPORT = re.compile(r"^import ([\w.]+)(?: as (\w+))?$", re.M)
+
+
+def gallery_calls() -> dict[str, set[str]]:
+    calls: dict[str, set[str]] = defaultdict(set)
+    for file in sorted((ROOT / "gallery/src/main/kotlin").rglob("*.kt")):
+        text = file.read_text(encoding="utf-8")
+        for match in KOTLIN_IMPORT.finditer(text):
+            qualified, alias = match.groups()
+            name = alias or qualified.rsplit(".", 1)[-1]
+            if re.search(rf"\b{re.escape(name)}\s*[(\x7b]", text[match.end():]):
+                calls[qualified].add(file.name)
+    return calls
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--gallery-coverage",
+        action="store_true",
+        help="List direct Gallery call sites and catalog entries without one, without rewriting the Markdown.",
+    )
+    args = parser.parse_args()
+    calls = gallery_calls() if args.gallery_coverage else {}
+    matched = 0
     out = [
         "# Component catalog",
         "",
@@ -76,6 +100,12 @@ def main() -> None:
                 names.add("Modifier." + match.group(2))
             if names:
                 groups[group][file.stem] |= names
+                if args.gallery_coverage:
+                    for name in sorted(names):
+                        targets = calls.get(f"{package.group(1)}.{name.removeprefix('Modifier.')}", ())
+                        matched += bool(targets)
+                        where = ", ".join(sorted(targets)) if targets else "-"
+                        print(f"{module}/{file.stem}.kt\t{name}\t{where}")
         if not groups:
             continue
         count = sum(len(n) for files in groups.values() for n in files.values())
@@ -88,6 +118,9 @@ def main() -> None:
                 names = ", ".join(f"`{n}`" for n in sorted(groups[group][stem]))
                 out.append(f"| `{stem}.kt` | {names} |")
             out.append("")
+    if args.gallery_coverage:
+        print(f"Direct Gallery calls: {matched}/{total} catalog entries (source scan)")
+        return
     out += [
         "## Foundation modules",
         "",

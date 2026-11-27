@@ -2,8 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package io.github.suqi8.coui.kmp.basic
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -11,12 +16,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -37,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,20 +52,26 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.navigationevent.NavigationEventInfo
+import androidx.navigationevent.compose.NavigationBackHandler
+import androidx.navigationevent.compose.rememberNavigationEventState
+import io.github.suqi8.coui.kmp.anim.COUIEase
 import io.github.suqi8.coui.kmp.anim.COUIMoveEase
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.basic.ChevronEnd
 import io.github.suqi8.coui.kmp.icon.basic.ChevronStart
 import io.github.suqi8.coui.kmp.theme.COUITheme
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import kotlin.time.Clock
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The ColorOS 17 month calendar: a weekday header row over a 7-column grid of day cells, with the
- * month/year title and the previous/next month buttons above it.
+ * month/year title and the previous/next month buttons above it. The title opens the year list.
  *
  * It mirrors the ColorOS 17 month page, its picker header and the day-picker chrome.
  * `basic/DatePicker.kt` is a three-wheel scroll picker and is *not* this component: ColorOS ships
@@ -139,6 +153,13 @@ fun CalendarView(
     val selected = value.coercedTo(yearRange)
     val todayDate = today ?: rememberCurrentDate()
     val scope = rememberCoroutineScope()
+    val monthDirection = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1 else 1
+    var choosingYear by remember { mutableStateOf(false) }
+    NavigationBackHandler(
+        state = rememberNavigationEventState(currentInfo = NavigationEventInfo.None),
+        isBackEnabled = choosingYear,
+        onBackCompleted = { choosingYear = false },
+    )
 
     // COUIDateMonthView lives inside COUICalendarDayViewPager; a horizontal throw turns the page
     // over 300ms on COUIMoveEase (COUICalendarViewPagerScroller).
@@ -172,132 +193,233 @@ fun CalendarView(
                 .padding(horizontal = CalendarViewDefaults.HeaderPadding),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = title(displayedYear, displayedMonth),
-                color = colors.titleColor,
-                style = CalendarViewDefaults.titleTextStyle(),
-                maxLines = 2,
-                textAlign = TextAlign.Center,
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                CalendarNavigationButton(
-                    icon = COUIIcons.Basic.ChevronStart,
-                    contentDescription = "Previous month",
-                    enabled = enabled && displayedMonthIndex > yearRange.first * 12,
-                    color = colors.titleColor,
-                    highlightColor = colors.highlightColor,
-                    onClick = { displayedMonthIndex-- },
+            val canChooseYear = yearRange.first < yearRange.last
+            val yearToggle = if (canChooseYear) {
+                Modifier.selectable(
+                    selected = choosingYear,
+                    enabled = enabled,
+                    role = Role.Button,
+                    onClick = { choosingYear = !choosingYear },
                 )
-                CalendarNavigationButton(
-                    icon = COUIIcons.Basic.ChevronEnd,
-                    contentDescription = "Next month",
-                    enabled = enabled && displayedMonthIndex < yearRange.last * 12 + 11,
-                    color = colors.titleColor,
-                    highlightColor = colors.highlightColor,
-                    onClick = { displayedMonthIndex++ },
-                )
+            } else {
+                Modifier
             }
-        }
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = CalendarViewDefaults.HorizontalPadding)
-                .padding(top = CalendarViewDefaults.VerticalPadding),
-        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(CalendarViewDefaults.WeekdayHeight),
+                modifier = Modifier.padding(horizontal = CalendarViewDefaults.NavigationButtonSize).then(yearToggle),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                for (column in 0 until 7) {
-                    Text(
-                        text = weekdayLabel((firstDayOfWeek - 1 + column) % 7 + 1),
-                        color = colors.weekdayColor,
-                        style = CalendarViewDefaults.weekdayTextStyle(),
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.weight(1f),
+                Text(
+                    text = title(displayedYear, displayedMonth),
+                    color = colors.titleColor,
+                    style = CalendarViewDefaults.titleTextStyle(),
+                    maxLines = 2,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (canChooseYear) {
+                    ExpandArrow(expanded = choosingYear, modifier = Modifier.size(16.dp), tint = colors.titleColor)
+                }
+            }
+            if (!choosingYear) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    CalendarNavigationButton(
+                        icon = COUIIcons.Basic.ChevronStart,
+                        contentDescription = "Previous month",
+                        enabled = enabled && displayedMonthIndex > yearRange.first * 12,
+                        color = colors.titleColor,
+                        highlightColor = colors.highlightColor,
+                        onClick = { displayedMonthIndex-- },
+                    )
+                    CalendarNavigationButton(
+                        icon = COUIIcons.Basic.ChevronEnd,
+                        contentDescription = "Next month",
+                        enabled = enabled && displayedMonthIndex < yearRange.last * 12 + 11,
+                        color = colors.titleColor,
+                        highlightColor = colors.highlightColor,
+                        onClick = { displayedMonthIndex++ },
                     )
                 }
             }
-            Column(
-                modifier = Modifier
-                    .height(
-                        CalendarViewDefaults.DayHeight * CalendarViewDefaults.ROW_COUNT,
-                    )
-                    .offset { IntOffset(gridOffsetPx.roundToInt(), 0) }
-                    .pointerInput(enabled, displayedMonthIndex, yearRange) {
-                        if (!enabled) return@pointerInput
-                        detectHorizontalDragGestures(
-                            onDragStart = {
-                                scope.launch { gridSettle.stop() }
-                                gridLiveDrag = 0f
-                            },
-                            onDragEnd = {
-                                val width = size.width.toFloat()
-                                val from = gridLiveDrag + gridSettle.value
-                                gridLiveDrag = 0f
-                                scope.launch {
-                                    gridSettle.snapTo(from)
-                                    val move = when {
-                                        from <= -width / CalendarViewDefaults.SwipeThresholdRatio ->
-                                            if (displayedMonthIndex < yearRange.last * 12 + 11) 1 else 0
-
-                                        from >= width / CalendarViewDefaults.SwipeThresholdRatio ->
-                                            if (displayedMonthIndex > yearRange.first * 12) -1 else 0
-
-                                        else -> 0
-                                    }
-                                    if (move != 0) {
-                                        // The new month enters from the side the finger came from.
-                                        displayedMonthIndex += move
-                                        gridSettle.snapTo(if (move > 0) from + width else from - width)
-                                    }
-                                    gridSettle.animateTo(
-                                        targetValue = 0f,
-                                        animationSpec = tween(
-                                            CalendarViewDefaults.SwipeDurationMillis,
-                                            easing = COUIMoveEase,
-                                        ),
-                                    )
-                                }
-                            },
-                            onHorizontalDrag = { change, delta ->
-                                change.consume()
-                                gridLiveDrag += delta
-                            },
-                        )
+        }
+        AnimatedContent(
+            targetState = choosingYear,
+            transitionSpec = {
+                fadeIn(tween(durationMillis = 280, easing = LinearEasing)) togetherWith
+                    fadeOut(tween(durationMillis = 150, easing = COUIEase))
+            },
+            label = "calendar month and year",
+        ) { showingYears ->
+            if (showingYears) {
+                CalendarYearList(
+                    yearRange = yearRange,
+                    activeYear = displayedYear,
+                    colors = colors,
+                    enabled = enabled && choosingYear,
+                    onYearSelected = { year ->
+                        val month = displayedMonth
+                        val day = selected.day.coerceAtMost(daysInMonth(year, month))
+                        displayedMonthIndex = year * 12 + month - 1
+                        choosingYear = false
+                        onValueChange(DateValue(year, month, day))
                     },
-            ) {
-                val firstCell = DateValue(displayedYear, displayedMonth, 1).plusDays(-leading)
-                for (row in 0 until rowCount) {
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = CalendarViewDefaults.HorizontalPadding)
+                        .padding(top = CalendarViewDefaults.VerticalPadding),
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(rowHeight),
+                            .height(CalendarViewDefaults.WeekdayHeight),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         for (column in 0 until 7) {
-                            val cell = firstCell.plusDays(row * 7 + column)
-                            DayCell(
-                                day = cell.day,
-                                inMonth = cell.year == displayedYear && cell.month == displayedMonth,
-                                isSelected = cell == selected,
-                                isToday = cell == todayDate,
-                                enabled = enabled && cell.year in yearRange,
-                                colors = colors,
-                                onClick = { onValueChange(cell) },
-                                description = dayDescription(cell.year, cell.month, cell.day),
+                            Text(
+                                text = weekdayLabel((firstDayOfWeek - 1 + column) % 7 + 1),
+                                color = colors.weekdayColor,
+                                style = CalendarViewDefaults.weekdayTextStyle(),
+                                maxLines = 1,
+                                textAlign = TextAlign.Center,
                                 modifier = Modifier.weight(1f),
                             )
                         }
                     }
+                    Column(
+                        modifier = Modifier
+                            .height(
+                                CalendarViewDefaults.DayHeight * CalendarViewDefaults.ROW_COUNT,
+                            )
+                            .absoluteOffset { IntOffset(gridOffsetPx.roundToInt(), 0) }
+                            .pointerInput(enabled, choosingYear, displayedMonthIndex, yearRange, monthDirection) {
+                                if (!enabled || choosingYear) return@pointerInput
+                                detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        scope.launch { gridSettle.stop() }
+                                        gridLiveDrag = 0f
+                                    },
+                                    onDragCancel = {
+                                        gridLiveDrag = 0f
+                                        scope.launch { gridSettle.snapTo(0f) }
+                                    },
+                                    onDragEnd = {
+                                        val width = size.width.toFloat()
+                                        val from = gridLiveDrag + gridSettle.value
+                                        gridLiveDrag = 0f
+                                        scope.launch {
+                                            gridSettle.snapTo(from)
+                                            val move = when {
+                                                from * monthDirection <= -width / CalendarViewDefaults.SwipeThresholdRatio ->
+                                                    if (displayedMonthIndex < yearRange.last * 12 + 11) 1 else 0
+
+                                                from * monthDirection >= width / CalendarViewDefaults.SwipeThresholdRatio ->
+                                                    if (displayedMonthIndex > yearRange.first * 12) -1 else 0
+
+                                                else -> 0
+                                            }
+                                            if (move != 0) {
+                                                // The new month enters from the side the finger came from.
+                                                displayedMonthIndex += move
+                                                gridSettle.snapTo(from + move * monthDirection * width)
+                                            }
+                                            gridSettle.animateTo(
+                                                targetValue = 0f,
+                                                animationSpec = tween(
+                                                    CalendarViewDefaults.SwipeDurationMillis,
+                                                    easing = COUIMoveEase,
+                                                ),
+                                            )
+                                        }
+                                    },
+                                    onHorizontalDrag = { change, delta ->
+                                        change.consume()
+                                        gridLiveDrag += delta
+                                    },
+                                )
+                            },
+                    ) {
+                        val firstCell = DateValue(displayedYear, displayedMonth, 1).plusDays(-leading)
+                        for (row in 0 until rowCount) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(rowHeight),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                for (column in 0 until 7) {
+                                    val cell = firstCell.plusDays(row * 7 + column)
+                                    DayCell(
+                                        day = cell.day,
+                                        inMonth = cell.year == displayedYear && cell.month == displayedMonth,
+                                        isSelected = cell == selected,
+                                        isToday = cell == todayDate,
+                                        enabled = enabled && !choosingYear && cell.year in yearRange,
+                                        colors = colors,
+                                        onClick = { onValueChange(cell) },
+                                        description = dayDescription(cell.year, cell.month, cell.day),
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun CalendarYearList(
+    yearRange: IntRange,
+    activeYear: Int,
+    colors: CalendarViewColors,
+    enabled: Boolean,
+    onYearSelected: (Int) -> Unit,
+) {
+    val state = rememberLazyListState(
+        initialFirstVisibleItemIndex = (activeYear - yearRange.first - 2).coerceAtLeast(0),
+    )
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(CalendarViewDefaults.WeekdayHeight + CalendarViewDefaults.DayHeight * CalendarViewDefaults.ROW_COUNT),
+        state = state,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        items(
+            count = yearRange.last - yearRange.first + 1,
+            key = { yearRange.first + it },
+        ) { index ->
+            val year = yearRange.first + index
+            val active = year == activeYear
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .selectable(
+                        selected = active,
+                        enabled = enabled,
+                        role = Role.Button,
+                        onClick = { onYearSelected(year) },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = year.toString(),
+                    color = if (active) colors.selectedDayContainerColor else colors.dayColor,
+                    style = CalendarViewDefaults.titleTextStyle(),
+                    fontSize = if (active) 26.sp else 16.sp,
+                    maxLines = 1,
+                )
             }
         }
     }

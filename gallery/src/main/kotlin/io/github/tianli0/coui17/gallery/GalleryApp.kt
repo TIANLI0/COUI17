@@ -67,7 +67,9 @@ fun tr(zh: String, en: String): String = if (LocalConfiguration.current.locales[
 enum class Tab { Components, Overlays, Theme }
 
 /** A detail page opened from the Components tab. */
-enum class Detail { Buttons, Selection, Input, Tags, Feedback, Lists, Glass }
+enum class Detail {
+    Buttons, Selection, Input, Tags, Feedback, Lists, Glass, Pickers, Colors, Search, Navigation, Security, Dialogs, Preferences,
+}
 
 @Composable
 fun GalleryApp() {
@@ -109,7 +111,7 @@ fun GalleryApp() {
                         when (open) {
                             null -> when (tab) {
                                 Tab.Components -> ComponentsHome(onOpen = { detail = it })
-                                Tab.Overlays -> OverlaysPage()
+                                Tab.Overlays -> OverlaysPage(onSpecializedDialogs = { detail = Detail.Dialogs })
                                 Tab.Theme -> ThemePage(
                                     modeIndex = modeIndex,
                                     onMode = { modeIndex = it },
@@ -124,6 +126,13 @@ fun GalleryApp() {
                             Detail.Feedback -> FeedbackPage { detail = null }
                             Detail.Lists -> ListsPage { detail = null }
                             Detail.Glass -> GlassPage { detail = null }
+                            Detail.Pickers -> PickersPage { detail = null }
+                            Detail.Colors -> ColorsPage { detail = null }
+                            Detail.Search -> SearchDemoPage { detail = null }
+                            Detail.Navigation -> NavigationDemoPage { detail = null }
+                            Detail.Security -> SecurityInputsPage { detail = null }
+                            Detail.Dialogs -> DialogDemoPage { detail = null }
+                            Detail.Preferences -> PreferenceVariantsPage { detail = null }
                         }
                     }
                 }

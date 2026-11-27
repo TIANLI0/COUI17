@@ -175,6 +175,9 @@ fun ComponentsHome(onOpen: (Detail) -> Unit) {
                     Entry(Detail.Selection, tr("选择控件", "Selection"), tr("开关、复选、单选、滑块、步进器", "Switch, checkbox, radio, slider, stepper"), COUIIcons.Tune, TileGreen),
                     Entry(Detail.Input, tr("输入", "Input"), tr("文本框与中文输入法", "Text fields and IME composition"), COUIIcons.Edit, TileOrange),
                     Entry(Detail.Tags, tr("标签与分段", "Tags and tabs"), tr("胶囊、标签、徽标、分段切换", "Chips, tags, badges, tab rows"), COUIIcons.Favorites, TilePurple),
+                    Entry(Detail.Pickers, tr("日期与时间", "Date and time"), tr("日历、公历、农历、时间和数字滚轮", "Calendar, date, lunar date, time and number wheels"), COUIIcons.ListView, TileCyan),
+                    Entry(Detail.Colors, tr("颜色选择", "Color pickers"), tr("色板、色样与四色彩空间", "Swatches, palette and four color spaces"), COUIIcons.Tune, TileOrange),
+                    Entry(Detail.Security, tr("安全输入", "Security inputs"), tr("验证码、数字键盘、图案与密码", "Code field, keypad, pattern and password"), COUIIcons.Edit, TileRed),
                 )
                 EntryGroup(rows, onOpen)
             }
@@ -182,8 +185,11 @@ fun ComponentsHome(onOpen: (Detail) -> Unit) {
             item {
                 val rows = listOf(
                     Entry(Detail.Lists, tr("列表与偏好项", "Lists and preferences"), tr("分组卡片里的行", "Rows inside group cards"), COUIIcons.ListView, TileCyan),
+                    Entry(Detail.Preferences, tr("偏好行变体", "Preference variants"), tr("行内编辑、弹出选项和独立控件", "Inline editing, option menus and independent controls"), COUIIcons.Tune, TileGreen),
                     Entry(Detail.Feedback, tr("进度与状态", "Progress and states"), tr("加载、空、错误、提示条", "Loading, empty, error, notices"), COUIIcons.Info, TileRed),
                     Entry(Detail.Glass, tr("悬浮玻璃", "Floating glass"), tr("浮在内容之上的毛玻璃控件", "Frosted controls over scrolling content"), COUIIcons.Layers, TileGrey),
+                    Entry(Detail.Search, tr("搜索", "Search"), tr("搜索历史、建议、加载与结果", "History, suggestions, loading and results"), COUIIcons.ListView, TileBlue),
+                    Entry(Detail.Navigation, tr("导航与工具栏", "Navigation and toolbars"), tr("底栏、侧栏、悬浮导航与附加操作", "Bottom navigation, rail, drawer and floating controls"), COUIIcons.Layers, TilePurple),
                 )
                 EntryGroup(rows, onOpen)
             }

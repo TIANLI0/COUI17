@@ -55,7 +55,7 @@ import io.github.tianli0.coui17.patterns.ToolbarIcon
 import io.github.tianli0.coui17.patterns.pageContainerColor
 
 @Composable
-fun OverlaysPage() {
+fun OverlaysPage(onSpecializedDialogs: () -> Unit) {
     var confirm by rememberSaveable { mutableStateOf(false) }
     var form by rememberSaveable { mutableStateOf(false) }
     var decision by rememberSaveable { mutableStateOf(false) }
@@ -118,20 +118,26 @@ fun OverlaysPage() {
                     ArrowPreference(
                         title = tr("确认对话框", "Confirmation"),
                         summary = tr("居中的标题、一段说明、取消 | 确认", "Centred title, one message, cancel | confirm"),
-                        cardListPosition = cardListPositionOf(0, 3),
+                        cardListPosition = cardListPositionOf(0, 4),
                         onClick = { confirm = true },
                     )
                     ArrowPreference(
                         title = tr("输入对话框", "Form dialog"),
                         summary = tr("问一个值：名称、行号、口令", "Asks for one value: a name, a line number"),
-                        cardListPosition = cardListPositionOf(1, 3),
+                        cardListPosition = cardListPositionOf(1, 4),
                         onClick = { rename = true },
                     )
                     ArrowPreference(
                         title = tr("单选对话框", "Choice dialog"),
                         summary = qualities[quality],
-                        cardListPosition = cardListPositionOf(2, 3),
+                        cardListPosition = cardListPositionOf(2, 4),
                         onClick = { choice = true },
+                    )
+                    ArrowPreference(
+                        title = tr("专用对话框", "Specialized dialogs"),
+                        summary = tr("加载、进度、安全确认和多页引导", "Loading, progress, security confirmation and multi-page guide"),
+                        cardListPosition = cardListPositionOf(3, 4),
+                        onClick = onSpecializedDialogs,
                     )
                 }
             }

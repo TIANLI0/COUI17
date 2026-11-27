@@ -223,6 +223,11 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.
 
+### 0022 — calendar, search, and navigation rail details
+
+Restore the calendar's month/year switch, mirror directional gestures, and align the search
+action spacing and rail geometry, labels, and state colors with COUI17 resources.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on
