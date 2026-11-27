@@ -228,6 +228,11 @@ to send upstream; once upstream has one, delete its patch file.
 Restore the calendar's month/year switch, mirror directional gestures, and align the search
 action spacing and rail geometry, labels, and state colors with COUI17 resources.
 
+### 0023 — search cancellation and density
+
+Close the floating search bar through the same cancellation callback for the button and system
+back. Apply the trailing capsule's slide in pixel coordinates.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on

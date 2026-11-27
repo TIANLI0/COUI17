@@ -685,7 +685,7 @@ private fun MetaBallSearchBarContainer(
     clearContentDescription: String,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val currentOnExpandedChange by rememberUpdatedState(onExpandedChange)
+    val currentOnCancel by rememberUpdatedState(onCancel)
     val navigationEventState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
     val progress = remember { Animatable(if (expanded) 1f else 0f) }
     LaunchedEffect(expanded) {
@@ -738,7 +738,7 @@ private fun MetaBallSearchBarContainer(
                         clearContentDescription = clearContentDescription,
                     )
                     SearchBarActionButtonSurface(
-                        onClick = onCancel,
+                        onClick = currentOnCancel,
                         modifier = Modifier.graphicsLayer {
                             val value = progress.value
                             val scale = searchBarCancelScale(value)
@@ -746,7 +746,7 @@ private fun MetaBallSearchBarContainer(
                             scaleY = scale
                             alpha = searchBarCancelAlpha(value)
                             val slide = geometry?.let { searchBarCancelTranslationX(it.cancelSlide, value) } ?: 0.dp
-                            translationX = if (rtl) -slide.value else slide.value
+                            translationX = if (rtl) -slide.toPx() else slide.toPx()
                         },
                         enabled = expanded,
                         motionState = cancelMotionState,
@@ -806,7 +806,7 @@ private fun MetaBallSearchBarContainer(
         state = navigationEventState,
         isBackEnabled = expanded,
         onBackCompleted = {
-            currentOnExpandedChange(false)
+            currentOnCancel()
         },
     )
 }
