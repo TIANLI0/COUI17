@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastFirst
 import androidx.compose.ui.util.fastFirstOrNull
 import io.github.suqi8.coui.kmp.blur.Backdrop
-import io.github.suqi8.coui.kmp.blur.BlurDefaults
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.ProgressiveBlur
 import io.github.suqi8.coui.kmp.blur.isBlurEnabled
@@ -399,18 +398,33 @@ internal fun AppBarMaterialLayout(
     materialRamp: AppBarMaterialRamp = AppBarMaterialRamp(),
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val blurEnabled = isBlurEnabled()
-    val extraHeightPx = if (blurEnabled) with(LocalDensity.current) { extraHeight.roundToPx() } else 0
-    val activeFraction = if (materialEnabled && blurEnabled) scrollFraction else ZeroBlurFraction
+    val blurEnabled = materialEnabled && isBlurEnabled()
+    val usePlatform = shouldUsePlatformAppBarMaterial(
+        platformRenderer = platformRenderer,
+        platformLocalEnabled = LocalPlatformAppBarMaterialEnabled.current,
+        squircleClippedHost = LocalSquircleClippedHost.current,
+        blurEnabled = blurEnabled,
+        hasDefaultRamp = materialRamp == AppBarMaterialRamp(),
+        hasBackdrop = backdrop != null,
+    )
+    val native = if (usePlatform) {
+        rememberPlatformAppBarBackdropRenderer()
+    } else {
+        null
+    }
+    val blurBackdrop = if (blurEnabled) backdrop else null
+    val hasBlurSource = native != null || blurBackdrop != null
+    val extraHeightPx = if (hasBlurSource) with(LocalDensity.current) { extraHeight.roundToPx() } else 0
+    val activeFraction = if (hasBlurSource) scrollFraction else ZeroBlurFraction
     Layout(
         content = {
             if (materialEnabled) {
                 AppBarMaterial(
                     modifier = Modifier.layoutId("material"),
                     containerColor = containerColor,
-                    backdrop = backdrop,
+                    backdrop = blurBackdrop,
                     scrollFraction = scrollFraction,
-                    platformRenderer = platformRenderer,
+                    native = native,
                     materialRamp = materialRamp,
                 )
             }
@@ -442,64 +456,19 @@ internal fun AppBarMaterialLayout(
     }
 }
 
-/**
- * The app bar material alone, for callers that place it behind their own bar content.
- *
- * It paints the gradient surface and the progressive blur over whatever size the caller measures
- * it to, or falls back to a solid [containerColor] fill when blur is disabled.
- * [io.github.suqi8.coui.kmp.basic.TopAppBar] measures it to the bar plus
- * [AppBarBlurOverlayDefaults.ExtraHeight] while reporting only the bar height.
- *
- * @param modifier The size and position of the material node.
- * @param containerColor The base colour of the alpha ramp, or the solid fill when blur is off.
- * @param backdrop The content to sample; `null` skips the blur and paints the ramp alone.
- * @param scrollFraction The material's overall alpha, read in the draw phase. At `0` the material
- *   draws nothing, so the content under the bar stays sharp — the native overlay's resting state. The
- *   node stays composed at `0`, so scrolling away from rest does not rebuild the blur.
- */
+/** Paints the progressive material when it has a source and a solid surface otherwise. */
 @Composable
-internal fun AppBarMaterial(
-    modifier: Modifier = Modifier,
-    containerColor: Color = AppBarBlurOverlayDefaults.containerColor(),
-    backdrop: Backdrop? = LocalBackdrop.current,
-    scrollFraction: () -> Float = { 1f },
-    platformRenderer: Boolean = true,
-    materialRamp: AppBarMaterialRamp = AppBarMaterialRamp(),
+private fun AppBarMaterial(
+    modifier: Modifier,
+    containerColor: Color,
+    backdrop: Backdrop?,
+    scrollFraction: () -> Float,
+    native: AppBarBackdropRenderer?,
+    materialRamp: AppBarMaterialRamp,
 ) {
     val density = LocalDensity.current
-    val blurEnabled = isBlurEnabled()
-    // The effect stays composed at every alpha, including 0. `AppBarBlurOverlayBehavior` only
-    // changes the overlay's alpha (and visibility at exactly 0) while scrolling; the RenderEffect is
-    // set once. Removing the blur node at rest and rebuilding it when scrolling starts recreated its
-    // layers and shaders on the first frame of every scroll, which showed as a flash. The alpha is a
-    // draw-phase read, so the bar still does not recompose on scroll frames.
-    //
-    // `isCOUIDarkThemeOrNightMode`, which picks the two-stop dark ramp over the three-stop light one.
-    // It is a property of the theme, not of the base colour, so a caller-supplied colour cannot move
-    // the ramp to the other branch.
     val isDarkTheme = COUITheme.colorScheme.background.luminance() < 0.5f
-    // Where the platform has its own backdrop blur (ColorOS 17), use it unless the caller opted
-    // out ([LocalPlatformAppBarMaterialEnabled]) or an enclosing host applies offscreen squircle
-    // clipping ([LocalSquircleClippedHost], e.g. NavDisplay), which cannot clip AndroidView
-    // window-surface effects and causes a dark corner overflow during transitions.
-    val usePlatform = shouldUsePlatformAppBarMaterial(
-        platformRenderer = platformRenderer,
-        platformLocalEnabled = LocalPlatformAppBarMaterialEnabled.current,
-        squircleClippedHost = LocalSquircleClippedHost.current,
-        blurEnabled = blurEnabled,
-        hasDefaultRamp = materialRamp == AppBarMaterialRamp(),
-        hasBackdrop = backdrop != null,
-    )
-    // Dark-mode neutral container colours (e.g. #303030, #1E1E1E) map to Color.Black for the
-    // 0.4 -> 0.0 top shadow veil so scrolled content and #303030 pages receive a visible dark
-    // gradient matching ColorOS 17 native bars and TopAppBarSearchBar, while blur-disabled
-    // fallback below keeps the caller's opaque containerColor intact.
     val gradientColor = resolveAppBarGradientColor(containerColor, isDarkTheme)
-    val native = if (usePlatform) {
-        rememberPlatformAppBarBackdropRenderer()
-    } else {
-        null
-    }
     if (native != null) {
         native.Material(
             containerColor = gradientColor,
@@ -509,34 +478,27 @@ internal fun AppBarMaterial(
         )
         return
     }
-    // When blur is disabled (power-saving mode, system material blur switch off, LocalBlurEnabled = false,
-    // or Android < 13), drawing the translucent ramp without a blurred backdrop lets scrolling text
-    // bleed sharply through the bar; fall back to a solid containerColor fill over the bar's own height.
-    val effect =
-        if (!blurEnabled) {
-            Modifier.background(containerColor)
-        } else {
-            val brush = appBarBlurOverlayBrush(gradientColor, isDarkTheme, materialRamp.alphaMidFraction)
-            if (backdrop == null) {
-                Modifier.background(brush)
-            } else {
-                Modifier.progressiveTextureBlur(
-                    backdrop = backdrop,
-                    shape = RectangleShape,
-                    // `AppBarBlurParams.startBlurRadius` is an HWUI radius; the engine derives its sigma
-                    // as 0.45 x the radius it is given, so the platform's value is converted first.
-                    blurRadius = with(density) {
-                        appBarEngineBlurRadiusPx(AppBarGlassDefaults.GradientBlurRadiusPx).toDp().value
-                    },
-                    gradient = ProgressiveBlur.Top.copy(
-                        startFraction = materialRamp.blurStartFraction.coerceIn(0f, 0.95f),
-                        endFraction = 1f,
-                        curve = materialRamp.blurCurve,
-                    ),
-                    colors = BlurDefaults.blurColors(),
-                ).background(brush)
-            }
+    val effect = if (backdrop == null) {
+        Modifier.background(containerColor)
+    } else {
+        val brush = appBarBlurOverlayBrush(gradientColor, isDarkTheme, materialRamp.alphaMidFraction)
+        remember(backdrop, brush, density, materialRamp) {
+            Modifier.progressiveTextureBlur(
+                backdrop = backdrop,
+                shape = RectangleShape,
+                // `AppBarBlurParams.startBlurRadius` is an HWUI radius; the engine derives its sigma
+                // as 0.45 x the radius it is given, so the platform's value is converted first.
+                blurRadius = with(density) {
+                    appBarEngineBlurRadiusPx(AppBarGlassDefaults.GradientBlurRadiusPx).toDp().value
+                },
+                gradient = ProgressiveBlur.Top.copy(
+                    startFraction = materialRamp.blurStartFraction.coerceIn(0f, 0.95f),
+                    endFraction = 1f,
+                    curve = materialRamp.blurCurve,
+                ),
+            ).background(brush)
         }
+    }
     Box(
         modifier = modifier
             .fillMaxSize()

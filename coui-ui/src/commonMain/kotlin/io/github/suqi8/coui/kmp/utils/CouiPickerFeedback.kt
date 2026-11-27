@@ -21,9 +21,7 @@ enum class CouiVibrateLevel {
 /**
  * A wheel-picker tick whose strength follows the scroll velocity.
  *
- * On Android this drives the ColorOS linear motor through `VibrateUtils` when the vendor API is
- * available and falls back to the discrete granular waveform otherwise; on every other platform it
- * maps to a standard Compose tick.
+ * Android uses the platform's segment feedback where available and a clock tick on older versions.
  *
  * @param velocity The absolute scroll velocity in pixels per second.
  * @param level The configured vibrate level.
@@ -34,9 +32,7 @@ expect fun rememberCouiPickerHaptic(): (velocity: Float, level: CouiVibrateLevel
 /**
  * The mechanical click a COUI wheel picker plays when it steps onto a new item.
  *
- * Android plays `coui_numberpicker_click` through a `SoundPool`; the audio asset is not part of this
- * library, so hosts that want the exact click add `res/raw/coui_numberpicker_click.ogg` to their own
- * module. Every other platform is silent.
+ * Android uses the system click sound and follows the user's sound-effect setting.
  */
 @Composable
 expect fun rememberCouiPickerClick(): () -> Unit

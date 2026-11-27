@@ -8,6 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import io.github.suqi8.coui.kmp.layout.DialogDefaults
+import io.github.suqi8.coui.kmp.input.couiLongPressSelection
+import io.github.suqi8.coui.kmp.input.couiLongPressSelectionItem
+import io.github.suqi8.coui.kmp.input.rememberCOUILongPressSelectionState
 import io.github.suqi8.coui.kmp.preference.RadioButtonPreference
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
@@ -236,7 +239,7 @@ fun FormDialog(
                 Modifier.fillMaxWidth().padding(horizontal = DialogContentGutter, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CompositionLocalProvider(LocalOnPageColor provides false) { content() }
+                CompositionLocalProvider(LocalOnPageColor provides true) { content() }
             }
             DialogButtonBar(
                 negative = DialogButtonBarAction(text = cancelText, onClick = onDismiss),
@@ -278,9 +281,11 @@ fun <T> ChoiceDialog(
     require(entries.map { it.value }.toSet().size == entries.size) { "ChoiceDialog entries need unique values" }
     WindowDialog(show = show, modifier = modifier, title = title, onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth()) {
+            val selection = rememberCOUILongPressSelectionState()
             Column(
                 Modifier
                     .weight(1f, fill = false)
+                    .couiLongPressSelection(selection)
                     .verticalScroll(rememberScrollState())
                     .selectableGroup(),
             ) {
@@ -297,20 +302,23 @@ fun <T> ChoiceDialog(
                     )
                 }
                 CompositionLocalProvider(LocalOnPageColor provides false) {
-                    entries.forEach { entry ->
+                    entries.forEachIndexed { index, entry ->
+                        val key = remember(entry.value) { Any() }
+                        val choose = {
+                            if (show && entry.enabled) {
+                                onSelect(entry.value)
+                                onDismiss()
+                            }
+                        }
                         RadioButtonPreference(
                             title = entry.text,
                             summary = entry.summary,
-                            selected = entry.value == selected,
+                            selected = selection.previewKey?.let { it === key } ?: (entry.value == selected),
                             enabled = entry.enabled,
                             insideMargin = PaddingValues(horizontal = DialogContentGutter, vertical = 14.dp),
-                            onClick = {
-                                if (show && entry.enabled) {
-                                    onSelect(entry.value)
-                                    onDismiss()
-                                }
-                            },
-                            modifier = Modifier.testTag("choice-${entries.indexOf(entry)}"),
+                            onClick = choose,
+                            modifier = Modifier.testTag("choice-$index")
+                                .couiLongPressSelectionItem(selection, key, show && entry.enabled, choose),
                         )
                     }
                 }

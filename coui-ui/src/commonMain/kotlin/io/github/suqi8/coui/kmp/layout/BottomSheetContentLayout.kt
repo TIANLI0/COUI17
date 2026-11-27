@@ -128,6 +128,7 @@ import io.github.suqi8.coui.kmp.theme.LocalDismissState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
@@ -210,6 +211,7 @@ internal fun BottomSheetContentLayout(
     content: @Composable () -> Unit,
 ) {
     val animationProgress = remember { Animatable(0f, visibilityThreshold = 0.0001f) }
+    val dimAlpha = remember { mutableFloatStateOf(1f) }
     val dragOffsetY = remember { Animatable(0f) }
     val contentScrollOffsetPx = remember { mutableFloatStateOf(0f) }
     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
@@ -227,6 +229,7 @@ internal fun BottomSheetContentLayout(
         if (show) {
             internalVisible.value = true
             dragOffsetY.snapTo(0f)
+            dimAlpha.floatValue = 1f
             contentScrollOffsetPx.floatValue = 0f
             animationProgress.animateTo(
                 targetValue = 1f,
@@ -262,7 +265,6 @@ internal fun BottomSheetContentLayout(
     if (!show && !internalVisible.value) return
 
     val coroutineScope = rememberCoroutineScope()
-    val dimAlpha = remember { mutableFloatStateOf(1f) }
     val dragSnapChannel = remember { Channel<Float>(capacity = Channel.CONFLATED) }
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
 
@@ -271,9 +273,10 @@ internal fun BottomSheetContentLayout(
     }
 
     val resetGesture: suspend () -> Unit = {
-        dragOffsetY.animateTo(0f, animationSpec = tween(durationMillis = 150))
-        animate(dimAlpha.floatValue, 1f, animationSpec = tween(durationMillis = 150)) { value, _ ->
-            dimAlpha.floatValue = value
+        coroutineScope {
+            val restore = tween<Float>(durationMillis = 150)
+            launch { dragOffsetY.animateTo(0f, animationSpec = restore) }
+            animate(dimAlpha.floatValue, 1f, animationSpec = restore) { value, _ -> dimAlpha.floatValue = value }
         }
     }
 

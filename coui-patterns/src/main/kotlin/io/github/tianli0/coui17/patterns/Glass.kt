@@ -46,7 +46,6 @@ import io.github.suqi8.coui.kmp.basic.BottomFloatingToolbarDefaults
 import io.github.suqi8.coui.kmp.basic.couiGlassSurface
 import io.github.suqi8.coui.kmp.blur.Backdrop
 import io.github.suqi8.coui.kmp.blur.BlendColorEntry
-import io.github.suqi8.coui.kmp.blur.BlurDefaults
 import io.github.suqi8.coui.kmp.blur.ProgressiveBlur
 import io.github.suqi8.coui.kmp.blur.isBlurEnabled
 import io.github.suqi8.coui.kmp.blur.progressiveTextureBlur
@@ -65,7 +64,7 @@ val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
  * key): frosted glass, blur and tint only — no rim, inner fade or shadow (over running text they
  * read as borders and halos).
  *
- * The tint layers are coui's `BottomFloatingToolbarDefaults` recipe, not a translucent card
+ * The blur radius and tint layers come from COUI17's `BottomFloatingToolbarDefaults` recipe, not a translucent card
  * colour: its `Luminosity` layer pulls whatever is behind to the surface's own brightness, so the
  * glass stays dark over white text in the dark theme and light over dark text in the light one.
  * [tint] adds a state's colour on top. Without a [LocalGlassBackdrop] it is the opaque card colour.
@@ -95,13 +94,11 @@ fun Modifier.glassSurface(
             shape = shape,
             containerColor = fill,
             fallback = Modifier.clip(shape).background(fill),
-            blurRadius = GLASS_BLUR_RADIUS,
+            blurRadius = BottomFloatingToolbarDefaults.blurRadiusDp(),
             blendColors = layers,
         )
         .clip(shape)
 }
-
-private const val GLASS_BLUR_RADIUS = 24f
 
 private fun glassLayers(dark: Boolean, tint: Color?): List<BlendColorEntry> {
     val base = if (dark) BottomFloatingToolbarDefaults.BlurColorsDark else BottomFloatingToolbarDefaults.BlurColorsLight
@@ -200,7 +197,7 @@ fun GlassGroup(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
                     shape = { state.union },
                     containerColor = fill,
                     fallback = Modifier,
-                    blurRadius = GLASS_BLUR_RADIUS,
+                    blurRadius = BottomFloatingToolbarDefaults.blurRadiusDp(),
                     blendColors = layers,
                 ),
         )
@@ -232,24 +229,29 @@ fun Modifier.glassHeader(containerColor: Color, holdFraction: Float): Modifier {
     val hold = holdFraction.coerceIn(0.05f, 0.9f)
     val backdrop = LocalGlassBackdrop.current
     if (backdrop == null || !isBlurEnabled()) {
-        return background(Brush.verticalGradient(0f to containerColor, hold to containerColor, 1f to containerColor.copy(alpha = 0f)))
+        val fill = remember(containerColor, hold) {
+            Brush.verticalGradient(0f to containerColor, hold to containerColor, 1f to containerColor.copy(alpha = 0f))
+        }
+        return background(fill)
     }
-    val tint = if (containerColor.luminance() < 0.5f) 0.6f else 0.8f
-    val tail = 1f - hold
-    return progressiveTextureBlur(
-        backdrop = backdrop,
-        shape = RectangleShape,
-        blurRadius = 26f,
-        gradient = ProgressiveBlur.Top.copy(startFraction = hold, endFraction = 1f, curve = 1.4f),
-        colors = BlurDefaults.blurColors(),
-    ).background(
-        Brush.verticalGradient(
-            0f to containerColor.copy(alpha = (tint + 0.25f).coerceAtMost(1f)),
-            hold to containerColor.copy(alpha = tint),
-            hold + tail * 0.5f to containerColor.copy(alpha = tint * 0.6f),
-            1f to containerColor.copy(alpha = 0f),
-        ),
-    )
+    val material = remember(backdrop, containerColor, hold) {
+        val tint = if (containerColor.luminance() < 0.5f) 0.6f else 0.8f
+        val tail = 1f - hold
+        Modifier.progressiveTextureBlur(
+            backdrop = backdrop,
+            shape = RectangleShape,
+            blurRadius = 26f,
+            gradient = ProgressiveBlur.Top.copy(startFraction = hold, endFraction = 1f, curve = 1.4f),
+        ).background(
+            Brush.verticalGradient(
+                0f to containerColor.copy(alpha = (tint + 0.25f).coerceAtMost(1f)),
+                hold to containerColor.copy(alpha = tint),
+                hold + tail * 0.5f to containerColor.copy(alpha = tint * 0.6f),
+                1f to containerColor.copy(alpha = 0f),
+            ),
+        )
+    }
+    return then(material)
 }
 
 /**

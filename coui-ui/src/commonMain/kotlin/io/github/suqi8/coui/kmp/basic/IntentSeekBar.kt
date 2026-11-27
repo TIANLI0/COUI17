@@ -12,6 +12,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.hoverable
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -52,6 +54,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
@@ -139,12 +142,10 @@ internal fun resolveIntentSeekBarVisualState(
  * @param modifier The modifier to be applied to the seek bar.
  * @param enabled Whether the seek bar reacts to input.
  * @param valueRange The range of values the bar can take.
- * @param secondaryProgress The buffered value, drawn under [value]. Coerced into [valueRange] and
- *   never drawn past [value], matching `COUISeekBarCore.drawActiveTrack`, which paints the secondary
- *   renderer first and the played progress over it inside one clip of the track capsule.
+ * @param secondaryProgress The buffered value, drawn beneath the played progress.
  * @param steps If positive, the number of discrete values between the ends of [valueRange]. Must not
  *   be negative.
- * @param onValueChangeFinished Called when a drag ends.
+ * @param onValueChangeFinished Called after a tap, completed drag or accessibility adjustment.
  * @param showSecondaryProgress Whether the secondary layer is drawn. Native default: true
  *   (`couiIntentSeekBarShowSecondaryProgress`).
  * @param showThumb Whether the thumb is drawn. Native default: false
@@ -192,9 +193,7 @@ fun IntentSeekBar(
     val hapticState = remember { SliderHapticState() }
 
     val coercedValue = value.coerceIn(valueRange.start, valueRange.endInclusive)
-    val coercedSecondary = secondaryProgress
-        .coerceIn(valueRange.start, valueRange.endInclusive)
-        .coerceAtMost(coercedValue)
+    val coercedSecondary = secondaryProgress.coerceIn(valueRange.start, valueRange.endInclusive)
 
     // COUISeekBarAdvanced.useDragTransitionAnimation() returns true for the intent bar: the played
     // progress follows the finger on a fast spring and settles on a slower one, exactly like Slider.
@@ -233,13 +232,13 @@ fun IntentSeekBar(
     val fractionSpan = valueRange.endInclusive - valueRange.start
     val valueToFraction: (Float) -> Float = { target -> ((target - valueRange.start) / fractionSpan).coerceIn(0f, 1f) }
     val fractionToValue: (Float) -> Float = { fraction ->
-        val raw = valueRange.start + fraction * fractionSpan
-        if (steps > 0) {
-            val position = (fraction * (steps + 1)).roundToInt()
-            valueRange.start + position / (steps + 1f) * fractionSpan
-        } else {
-            raw
-        }
+        val intervals = steps + 1f
+        val snappedFraction = if (steps > 0) (fraction * intervals).roundToInt() / intervals else fraction
+        valueRange.start + snappedFraction * fractionSpan
+    }
+    val offsetToValue: (Float, Int) -> Float = { offset, width ->
+        val visual = intentFraction(offset, width, capInsetPx)
+        fractionToValue(if (reverseDirection) 1f - visual else visual)
     }
     val keyPointFractions = remember(steps) {
         if (steps <= 0) floatArrayOf() else FloatArray(steps + 2) { it / (steps + 1f) }
@@ -305,9 +304,7 @@ fun IntentSeekBar(
                             orientation = Orientation.Horizontal,
                             state = rememberDraggableState { dragAmount ->
                                 dragOffset += dragAmount
-                                val visual = intentFraction(dragOffset, layoutWidth, capInsetPx)
-                                val fraction = if (reverseDirection) 1f - visual else visual
-                                val calculated = fractionToValue(fraction)
+                                val calculated = offsetToValue(dragOffset, layoutWidth)
                                 onValueChangeState(calculated)
                                 hapticState.handleHapticFeedback(
                                     currentValue = calculated,
@@ -321,9 +318,7 @@ fun IntentSeekBar(
                                 isDragging = true
                                 isThumbGrabbed = true
                                 dragOffset = offset.x
-                                val visual = intentFraction(offset.x, layoutWidth, capInsetPx)
-                                val fraction = if (reverseDirection) 1f - visual else visual
-                                val calculated = fractionToValue(fraction)
+                                val calculated = offsetToValue(offset.x, layoutWidth)
                                 onValueChangeState(calculated)
                                 hapticState.reset(calculated)
                             },
@@ -333,6 +328,12 @@ fun IntentSeekBar(
                                 onValueChangeFinishedState?.invoke()
                             },
                         )
+                        .pointerInput(reverseDirection, capInsetPx, valueRange, steps) {
+                            detectTapGestures { offset ->
+                                onValueChangeState(offsetToValue(offset.x, layoutWidth))
+                                onValueChangeFinishedState?.invoke()
+                            }
+                        }
                         .indication(interactionSource, null)
                 } else {
                     Modifier
@@ -344,23 +345,29 @@ fun IntentSeekBar(
                     valueRange.start..valueRange.endInclusive,
                     if (steps > 0) steps else 0,
                 )
-                setProgress { target ->
-                    onValueChangeState(target.coerceIn(valueRange.start, valueRange.endInclusive))
-                    true
+                if (enabled) {
+                    setProgress { target ->
+                        if (!target.isFinite()) return@setProgress false
+                        val resolved = fractionToValue(valueToFraction(target))
+                        if (resolved == coercedValue) return@setProgress false
+                        onValueChangeState(resolved)
+                        onValueChangeFinishedState?.invoke()
+                        true
+                    }
+                } else {
+                    disabled()
                 }
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        val valueFraction = valueToFraction(animatedValueState.value).let { if (reverseDirection) 1f - it else it }
-        val secondaryFraction = valueToFraction(animatedSecondaryState.value)
-            .let { if (reverseDirection) 1f - it else it }
         IntentSeekBarTrack(
             backgroundColor = colors.backgroundColor,
             progressColor = colors.progressColor,
             secondaryProgressColor = colors.secondaryProgressColor,
             thumbColor = colors.thumbColor,
-            valueFraction = valueFraction,
-            secondaryFraction = secondaryFraction,
+            valueFraction = valueToFraction(animatedValueState.value),
+            secondaryFraction = valueToFraction(animatedSecondaryState.value),
+            reverseDirection = reverseDirection,
             trackHeightPx = trackHeightPx,
             thumbRadiusPx = thumbRadiusPx,
             capInsetPx = capInsetPx,
@@ -424,6 +431,7 @@ private fun IntentSeekBarTrack(
     thumbColor: Color,
     valueFraction: Float,
     secondaryFraction: Float,
+    reverseDirection: Boolean,
     trackHeightPx: Float,
     thumbRadiusPx: Float,
     capInsetPx: Float,
@@ -453,75 +461,79 @@ private fun IntentSeekBarTrack(
             )
         }
 
-        drawPath(capsule, color = backgroundColor)
+        scale(scaleX = if (reverseDirection) -1f else 1f, scaleY = 1f) {
+            drawPath(capsule, color = backgroundColor)
 
-        // COUIIntentSeekBar.drawActiveTrack: both loading states replace the played progress. The
-        // full state paints only the sweep over the bare track; the partial state keeps the played
-        // progress inside the swept clip.
-        val sweep = loadingFraction
-        when {
-            visualState == IntentSeekBarVisualState.LoadingFull && sweep != null -> {
-                drawLoadingSweep(
-                    sweep = sweep,
-                    trackLength = size.width,
-                    progressStart = 0f,
-                    top = top,
-                    height = trackHeightPx,
-                    radius = radius,
-                )
-            }
-
-            visualState == IntentSeekBarVisualState.LoadingPartial && sweep != null -> {
-                clipPath(capsule) {
-                    drawLoadingSweep(
-                        sweep = sweep,
-                        trackLength = available,
-                        progressStart = capInsetPx,
-                        progressFraction = valueFraction,
-                        top = top,
-                        height = trackHeightPx,
-                        radius = radius,
-                    )
-                    drawIntentBar(progressColor, valueFraction, capInsetPx, available, top, trackHeightPx, radius)
-                }
-            }
-
-            else -> {
-                clipPath(capsule) {
-                    if (showSecondaryProgress) {
-                        drawIntentBar(secondaryProgressColor, secondaryFraction, capInsetPx, available, top, trackHeightPx, radius)
-                    }
-                    drawIntentBar(progressColor, valueFraction, capInsetPx, available, top, trackHeightPx, radius)
-                }
-                if (
-                    visualState == IntentSeekBarVisualState.PlayingConeLight ||
-                    visualState == IntentSeekBarVisualState.DraggingConeLight
-                ) {
+            // COUIIntentSeekBar.drawActiveTrack: both loading states replace the played progress. The
+            // full state paints only the sweep over the bare track; the partial state keeps the played
+            // progress inside the swept clip.
+            val sweep = loadingFraction
+            when {
+                visualState == IntentSeekBarVisualState.LoadingFull && sweep != null -> {
                     clipPath(capsule) {
-                        drawConeLightSheen(
-                            fraction = valueFraction,
-                            capInsetPx = capInsetPx,
-                            available = available,
+                        drawLoadingSweep(
+                            sweep = sweep,
+                            trackLength = size.width,
+                            progressStart = 0f,
                             top = top,
                             height = trackHeightPx,
                             radius = radius,
                         )
                     }
                 }
-            }
-        }
 
-        if (showThumb && visualState != IntentSeekBarVisualState.LoadingFull) {
-            // COUIIntentSeekBar.applyThumbSize: thumbMaxRadius is the pressed radius.
-            val thumbRadius = if (thumbPressed) maxOf(thumbRadiusPx, capInsetPx) else thumbRadiusPx
-            val thumbCenter = Offset(capInsetPx + valueFraction * available, centerY)
-            // IntentThumbRenderer skips the shadow layer on a disabled bar.
-            if (enabled) drawThumbShadow(thumbCenter, thumbRadius)
-            drawCircle(
-                color = thumbColor,
-                radius = thumbRadius,
-                center = thumbCenter,
-            )
+                visualState == IntentSeekBarVisualState.LoadingPartial && sweep != null -> {
+                    clipPath(capsule) {
+                        drawLoadingSweep(
+                            sweep = sweep,
+                            trackLength = available,
+                            progressStart = capInsetPx,
+                            progressFraction = valueFraction,
+                            top = top,
+                            height = trackHeightPx,
+                            radius = radius,
+                        )
+                        drawIntentBar(progressColor, valueFraction, capInsetPx, available, top, trackHeightPx, radius)
+                    }
+                }
+
+                else -> {
+                    clipPath(capsule) {
+                        if (showSecondaryProgress) {
+                            drawIntentBar(secondaryProgressColor, secondaryFraction, capInsetPx, available, top, trackHeightPx, radius)
+                        }
+                        drawIntentBar(progressColor, valueFraction, capInsetPx, available, top, trackHeightPx, radius)
+                    }
+                    if (
+                        visualState == IntentSeekBarVisualState.PlayingConeLight ||
+                        visualState == IntentSeekBarVisualState.DraggingConeLight
+                    ) {
+                        clipPath(capsule) {
+                            drawConeLightSheen(
+                                fraction = valueFraction,
+                                capInsetPx = capInsetPx,
+                                available = available,
+                                top = top,
+                                height = trackHeightPx,
+                                radius = radius,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showThumb && visualState != IntentSeekBarVisualState.LoadingFull) {
+                // COUIIntentSeekBar.applyThumbSize: thumbMaxRadius is the pressed radius.
+                val thumbRadius = if (thumbPressed) maxOf(thumbRadiusPx, capInsetPx) else thumbRadiusPx
+                val thumbCenter = Offset(capInsetPx + valueFraction * available, centerY)
+                // IntentThumbRenderer skips the shadow layer on a disabled bar.
+                if (enabled) drawThumbShadow(thumbCenter, thumbRadius)
+                drawCircle(
+                    color = thumbColor,
+                    radius = thumbRadius,
+                    center = thumbCenter,
+                )
+            }
         }
     }
 }

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.hoverable
@@ -113,7 +114,7 @@ import kotlin.math.roundToInt
  * @param startFromMiddle Whether the active track grows from the middle of the bar towards the
  *   thumb instead of from the start edge (COUI couiSeekBarStartMiddle). New in 1.2.0.
  * @param moveByFinger Whether the thumb follows the finger's displacement instead of jumping to the
- *   finger's position (COUI `MOVE_BY_FINGER`; the default is `MOVE_BY_DISTANCE`). New in 1.2.0.
+ *   finger's position during a drag. A tap always selects the tapped position (COUI `MOVE_BY_FINGER`; the default is `MOVE_BY_DISTANCE`). New in 1.2.0.
  */
 @Composable
 fun Slider(
@@ -461,6 +462,15 @@ fun VerticalSlider(
                                 }
                             },
                         )
+                        .pointerInput(reverseDirection, fractionToValueVertical) {
+                            detectTapGestures { tap ->
+                                flingJob?.cancel()
+                                val visual = verticalVisualFraction(tap.y, layoutHeight, layoutWidth)
+                                val fraction = if (reverseDirection) visual else 1f - visual
+                                onValueChangeState(fractionToValueVertical(fraction))
+                                onValueChangeFinishedState?.invoke()
+                            }
+                        }
                         .indication(interactionSource, null)
                 } else {
                     Modifier
@@ -856,6 +866,27 @@ fun RangeSlider(
                                 onValueChangeFinishedState?.invoke()
                             },
                         )
+                        .pointerInput(isRtl, restingInsetPx, valueRange, fractionToValueRange) {
+                            detectTapGestures { tap ->
+                                val span = valueRange.endInclusive - valueRange.start
+                                val start = currentStartValue.coerceIn(valueRange)
+                                val end = currentEndValue.coerceIn(valueRange)
+                                val visual = horizontalVisualFraction(tap.x, layoutWidth, restingInsetPx)
+                                val target = fractionToValueRange(if (isRtl) 1f - visual else visual)
+                                val picksStart = when {
+                                    target < start -> true
+                                    target > end -> false
+                                    else -> rangePressPicksStart(
+                                        tap.x, layoutWidth, restingInsetPx,
+                                        (start - valueRange.start) / span, (end - valueRange.start) / span,
+                                        isRtl, lastDraggedIsStart,
+                                    )
+                                }
+                                lastDraggedIsStart = picksStart
+                                onValueChangeState(if (picksStart) target.coerceAtMost(end)..end else start..target.coerceAtLeast(start))
+                                onValueChangeFinishedState?.invoke()
+                            }
+                        }
                         .indication(interactionSource, null)
                 } else {
                     Modifier
@@ -1986,6 +2017,9 @@ object SliderDefaults {
      * (COUI `coui_seekbar_background_height` / `coui_seekbar_progress_height`).
      */
     val MinHeight = 20.dp
+
+    /** Distance from the edge to the first and last stops at the default track height. */
+    val HorizontalTrackInset = 14.dp
 
     /**
      * The minimum height of the slider's touch target (COUI `couiSeekBarMinHeight`): the track is

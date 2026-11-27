@@ -41,25 +41,9 @@ object GalleryDensityDefaults {
 }
 
 /**
- * The density ColorOS 17's Gallery lays itself out at, with the platform's `fontScale` kept, or the
- * platform density on a platform without a display-size override to look past.
- *
- * Gallery ignores the display-size setting: it pins its resources to the dpi
- * [GalleryDensityDefaults.densityDpi] describes, so its toolbar keys, bottom bar and accessory balls
- * measure the same pixels at any density the user picks. Provide this density around that fixed-size
- * chrome and it lands on Gallery's pixels too: on the PKT110 a 56dp accessory ball measures 196px
- * and a 40dp toolbar key 140px, the same as Gallery's, instead of 217px and 155px at the system's
- * 620 dpi.
- *
- * ```kotlin
- * CompositionLocalProvider(LocalDensity provides rememberGalleryDensity()) {
- *     BottomFloatingNavigationBar { /* items */ }
- * }
- * ```
- *
- * Keep the layout around that chrome — its alignment, insets and outer margins — at the platform
- * density. Anchored popups convert to the panel density on their own, so they are safe either side
- * of the scope.
+ * Uses Android's stable display density with the current font scale, for opt-in fixed-size chrome.
+ * If the platform cannot provide a stable density, uses the current Compose density.
+ * Keep surrounding layout and insets at the current density so they follow the display size setting.
  */
 @Composable
 fun rememberGalleryDensity(): Density {
@@ -75,8 +59,7 @@ fun rememberGalleryDensity(): Density {
 }
 
 /**
- * The dpi from [GalleryDensityDefaults.densityDpi] for the current display, or `null` on a platform
- * that has no display-size override to look past.
+ * The platform stable density in dpi, or `null` when unavailable.
  */
 @Composable
 internal expect fun platformGalleryDensityDpi(): Int?

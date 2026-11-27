@@ -261,7 +261,7 @@ fun BottomFloatingToolbarGroup(
     val systemCaustic = rememberPlatformCausticShadowRenderer() != null
     val density = LocalDensity.current
     val cornerRadiusPx = with(density) { cornerRadius.toPx() }
-    val blurRadius = with(density) { (BottomFloatingToolbarDefaults.BlurRadius / TEXTURE_BLUR_SIGMA_SCALE).toDp().value }
+    val blurRadius = BottomFloatingToolbarDefaults.blurRadiusDp()
     val itemCount = remember { intArrayOf(0) }
     val height = BottomFloatingToolbarDefaults.MenuViewHeight
     var capsuleWidthPx by remember { mutableIntStateOf(0) }
@@ -619,6 +619,10 @@ object BottomFloatingToolbarDefaults {
      * [TEXTURE_BLUR_SIGMA_SCALE] before handing it to [textureBlur].
      */
     val BlurRadius = 30f
+
+    /** Radius in the Compose texture engine's dp units for the floating-toolbar material. */
+    @Composable
+    fun blurRadiusDp(): Float = with(LocalDensity.current) { (BlurRadius / TEXTURE_BLUR_SIGMA_SCALE).toDp().value }
 
     /**
      * The tint layers laid over the blurred backdrop in the light theme, in [textureBlur] list

@@ -12,7 +12,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.Badge
@@ -76,7 +81,7 @@ fun SwitchPreference(
     val currentOnCheckedChange by rememberUpdatedState(onCheckedChange)
     val currentOnClick by rememberUpdatedState(onClick)
     BasicComponent(
-        modifier = modifier,
+        modifier = modifier.semantics { toggleableState = ToggleableState(checked) },
         insideMargin = insideMargin,
         cardListPosition = cardListPosition,
         title = title,
@@ -152,7 +157,7 @@ fun SwitchPreference(
     val currentOnClick by rememberUpdatedState(onClick)
     BasicComponent(
         title = title,
-        modifier = modifier,
+        modifier = modifier.semantics { toggleableState = ToggleableState(checked) },
         titleColor = titleColor,
         summary = summary,
         summaryColor = summaryColor,
@@ -259,6 +264,8 @@ private fun SwitchPreferenceEndActions(
     switchColors: SwitchColors,
 ) {
     Switch(
+        // The row exposes the labelled switch; this thumb still handles direct taps and drags.
+        modifier = Modifier.focusProperties { canFocus = false }.clearAndSetSemantics {},
         checked = checked,
         onCheckedChange = { checkedNew ->
             onCheckedChange?.invoke(checkedNew)

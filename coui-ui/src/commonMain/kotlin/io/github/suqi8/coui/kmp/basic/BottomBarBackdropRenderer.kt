@@ -11,10 +11,9 @@ import androidx.compose.ui.Modifier
  * Whether the bottom floating navigation bars hand their blur, stroke, shadow and melt ball to the
  * platform material, when the device has it.
  *
- * Defaults to `true`: where the device exposes the system material (`setBackgroundRenderEffect`
+ * Defaults to `false`. When explicitly enabled where the device exposes the system material (`setBackgroundRenderEffect`
  * plus `setCornerParams` / `setEdgeParams` / `setShadowParams`, the caustic shadow and
- * `setMetaBallChain`), the bar uses it and matches the system pixel for pixel; everywhere else it
- * keeps the Compose renderer. The platform path costs 0.7–1.5 ms more per frame on the reference
+ * `setMetaBallChain`), the bar uses it. On other devices it keeps the Compose renderer. The platform path costs 0.7–1.5 ms more per frame on the reference
  * device (13–16 % of the frame) without losing a frame — both paths sustain the display's refresh
  * rate. Set it to `false` to keep the Compose renderer on ColorOS as well.
  *
@@ -22,7 +21,7 @@ import androidx.compose.ui.Modifier
  * with blur switched off — by the user or by the system's power-saving state — the native
  * `RenderEffect` would still blur the backdrop, so the bar goes back to the Compose engine instead.
  */
-val LocalPlatformBottomBarMaterialEnabled = compositionLocalOf { true }
+val LocalPlatformBottomBarMaterialEnabled = compositionLocalOf { false }
 
 /**
  * One silhouette the platform material paints inside a melt-ball chain, in host pixels.

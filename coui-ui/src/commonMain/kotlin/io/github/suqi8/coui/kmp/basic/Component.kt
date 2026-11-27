@@ -111,9 +111,9 @@ fun BasicComponent(
     // measure, so the row reads it there too: publishing the value as a composition local made the row
     // recompose once the text had settled, and the frame before that recomposition was a one-line row
     // with the icon centred.
-    val titleGeometry = remember { mutableStateOf(TextLineGeometry()) }
-    val summaryGeometry = remember { mutableStateOf(TextLineGeometry()) }
-    val metricsSource = remember {
+    val titleGeometry = remember(title != null) { mutableStateOf(TextLineGeometry()) }
+    val summaryGeometry = remember(summary != null) { mutableStateOf(TextLineGeometry()) }
+    val metricsSource = remember(titleGeometry, summaryGeometry) {
         PreferenceTextMetricsSource {
             PreferenceTextMetrics(titleGeometry.value, summaryGeometry.value)
         }
@@ -189,8 +189,8 @@ fun BasicComponent(
     interactionSource: MutableInteractionSource? = null,
 ) {
     val titleGeometry = remember { mutableStateOf(TextLineGeometry()) }
-    val summaryGeometry = remember { mutableStateOf(TextLineGeometry()) }
-    val metricsSource = remember {
+    val summaryGeometry = remember(summary != null) { mutableStateOf(TextLineGeometry()) }
+    val metricsSource = remember(summaryGeometry) {
         PreferenceTextMetricsSource {
             PreferenceTextMetrics(titleGeometry.value, summaryGeometry.value)
         }

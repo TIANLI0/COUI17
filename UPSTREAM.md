@@ -188,6 +188,37 @@ Each change is one file in `patches/`, re-applied in file-name order on every sy
   `true`, unchanged) lets an app keep the material on at rest, as `AppBarBlurOverlayView` does
   unless `scrollDrivenAlphaEnabled` is set — what ColorOS Gallery's pages inflate. Radii (30 → 0,
   speed 3), the dark ramp (0.4 → 0) and the 8dp band were already the framework's.
+### 0016 — portable materials, popup density and picker feedback
+
+- App bars, bottom bars and caustic shadows default to the Compose renderer. The existing native material opt-in is available for hosts that want to use it.
+- App bar blur, its extra fade band and the toolbar's blur fraction require a working backdrop source. When blur is unavailable, the bar uses the solid fill at its measured height.
+- Popup content uses the caller's density and font scale. The explicit `rememberGalleryDensity` helper uses Android's public stable density. Picker feedback uses Android haptic and click APIs.
+- Android's global blur and battery settings are observed independently of optional ColorOS settings.
+
+### 0017 — selection, playback and touch motion
+
+- Switch, checkbox and radio preference rows expose their labelled state as one target. Split checkbox rows keep their separate labelled action. Removing a row's title or summary resets its measured line geometry.
+- Intent seek bars handle taps, stepped adjustment and a mirrored RTL track. Buffered progress remains visible ahead of playback. Both intent slider APIs reject accessibility changes when disabled.
+- A claimed touch-motion drag tracks the finger back through its initial dead zone, and changes to the gesture configuration clear its transforms and press light.
+
+### 0018 — backdrop sampling for nested windows
+
+- A menu or dialog captures the window it opened from. When that host is itself a dialog, its transparent pixels are composited over the inherited capture using screen coordinates.
+- A host without a measured size retries when its first draw arrives. Window capture is still limited to one copy in flight and redraw-driven updates.
+
+### 0019 — synchronized back-gesture recovery
+
+- Dialog scale and dim use the same predictive-back progress. Reopening resets the prior gesture before entering.
+- A sheet restores its position and dim together when the gesture is cancelled. Reopening clears the previous dim fraction.
+
+### 0020 — tap-to-position sliders and floating toolbar blur radius
+
+- Horizontal sliders commit one value on tap using the thumb's track geometry. Range and vertical sliders use the same step resolution for taps as for dragging.
+- The floating toolbar exposes its Compose blur radius so the same material can be used by floating composer fields and keys.
+
+### 0021 — long-press and drag selection
+
+- The shared press selector previews an enabled item under the finger and commits on release. Floating tabs retain regular taps and their dedicated overflow long-press action. Single-choice dialogs retain vertical scroll for a swipe that starts before the hold.
 
 0001–0004 are small, additive and off by default where they add behaviour, so they are candidates
 to send upstream; once upstream has one, delete its patch file.

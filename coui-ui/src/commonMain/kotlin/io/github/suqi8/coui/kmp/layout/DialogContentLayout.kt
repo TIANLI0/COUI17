@@ -4,7 +4,6 @@ package io.github.suqi8.coui.kmp.layout
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -33,7 +32,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -178,6 +176,7 @@ internal fun DialogContentLayout(
 ) {
     val animationProgress = remember { Animatable(0f, visibilityThreshold = 0.0001f) }
     val dimProgress = remember { Animatable(0f) }
+    val backProgress = remember { Animatable(0f) }
     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
     val internalVisible = remember { mutableStateOf(false) }
 
@@ -191,6 +190,7 @@ internal fun DialogContentLayout(
         // swap the spec or relaunch the effect.
         val centeredAtStart = isCentered
         if (show) {
+            backProgress.snapTo(0f)
             internalVisible.value = true
             if (enableWindowDim) {
                 launch { dimProgress.animateTo(1f, tween(EnterDurationMillis, easing = DialogEnterEasing)) }
@@ -221,9 +221,7 @@ internal fun DialogContentLayout(
     if (!show && !internalVisible.value) return
 
     val coroutineScope = rememberCoroutineScope()
-    val dimAlpha = remember { mutableFloatStateOf(1f) }
     val dialogHeightPx = remember { mutableIntStateOf(0) }
-    val backProgress = remember { Animatable(0f) }
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
 
     val windowInfo = LocalWindowInfo.current
@@ -232,22 +230,15 @@ internal fun DialogContentLayout(
         { currentOnDismissRequest?.invoke() }
     }
 
-    val resetGesture: suspend () -> Unit = remember {
-        {
-            backProgress.animateTo(0f, animationSpec = tween(durationMillis = 150))
-            animate(dimAlpha.floatValue, 1f, animationSpec = tween(durationMillis = 150)) { value, _ ->
-                dimAlpha.floatValue = value
-            }
-        }
-    }
-
     popupHost(internalVisible.value) {
         val navigationEventState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
         NavigationBackHandler(
             state = navigationEventState,
             isBackEnabled = show,
             onBackCancelled = {
-                coroutineScope.launch { resetGesture() }
+                coroutineScope.launch {
+                    backProgress.animateTo(0f, animationSpec = tween(durationMillis = 150))
+                }
             },
             onBackCompleted = { requestDismiss() },
         )
@@ -261,9 +252,7 @@ internal fun DialogContentLayout(
                         transitionState is NavigationEventTransitionState.InProgress &&
                         transitionState.direction == NavigationEventTransitionState.TRANSITIONING_BACK
                     ) {
-                        val progress = transitionState.latestEvent.progress
-                        backProgress.snapTo(progress)
-                        dimAlpha.floatValue = 1f - progress
+                        backProgress.snapTo(transitionState.latestEvent.progress)
                     }
                 }
         }
@@ -274,7 +263,7 @@ internal fun DialogContentLayout(
                 modifier = Modifier
                     .fillMaxSize()
                     .drawBehind {
-                        drawRect(baseColor.copy(alpha = baseColor.alpha * dimAlpha.floatValue * dimProgress.value))
+                        drawRect(baseColor.copy(alpha = baseColor.alpha * (1f - backProgress.value) * dimProgress.value))
                     },
             )
         }

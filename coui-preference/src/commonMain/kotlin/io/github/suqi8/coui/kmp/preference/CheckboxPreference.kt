@@ -14,7 +14,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.BasicComponent
@@ -75,8 +81,18 @@ fun CheckboxPreference(
     val currentOnCheckedChange by rememberUpdatedState(onCheckedChange)
     val currentOnMainLayoutClick by rememberUpdatedState(onMainLayoutClick)
 
+    val splitActions = onMainLayoutClick != null
+    val checkboxModifier = if (splitActions) {
+        Modifier.semantics { contentDescription = title }
+    } else {
+        Modifier.focusProperties { canFocus = false }.clearAndSetSemantics {}
+    }
+
     BasicComponent(
-        modifier = modifier,
+        modifier = if (splitActions) modifier else modifier.semantics {
+            role = Role.Checkbox
+            toggleableState = ToggleableState(checked)
+        },
         insideMargin = insideMargin,
         cardListPosition = cardListPosition,
         title = title,
@@ -88,6 +104,7 @@ fun CheckboxPreference(
                 Row {
                     if (checkboxLocation == CheckboxLocation.Start) {
                         CheckboxPreferenceStartAction(
+                            modifier = checkboxModifier,
                             checked = checked,
                             onCheckedChange = currentOnCheckedChange,
                             enabled = enabled,
@@ -122,6 +139,7 @@ fun CheckboxPreference(
 
             if (checkboxLocation == CheckboxLocation.End) {
                 CheckboxPreferenceEndAction(
+                    modifier = checkboxModifier,
                     checked = checked,
                     onCheckedChange = currentOnCheckedChange,
                     enabled = enabled,
@@ -130,16 +148,12 @@ fun CheckboxPreference(
             }
         },
         bottomAction = bottomAction,
-        onClick = {
-            val mainLayoutClick = currentOnMainLayoutClick
-            if (mainLayoutClick != null) {
-                mainLayoutClick()
-            } else {
-                currentOnCheckedChange.takeIf { enabled }?.invoke(!checked)
-            }
+        onClick = when {
+            splitActions -> { { currentOnMainLayoutClick?.invoke() } }
+            onCheckedChange != null -> { { currentOnCheckedChange?.invoke(!checked) } }
+            else -> null
         },
-        onClickLabel = CheckboxPreferenceDefaults.SwitchActionLabel,
-        role = Role.Checkbox,
+        role = if (splitActions) Role.Button else Role.Checkbox,
         holdDownState = holdDownState,
         enabled = enabled,
     )
@@ -190,6 +204,7 @@ fun CheckboxPreference(
 
 @Composable
 private fun CheckboxPreferenceStartAction(
+    modifier: Modifier,
     checked: Boolean,
     onCheckedChange: ((Boolean) -> Unit)?,
     enabled: Boolean,
@@ -205,8 +220,7 @@ private fun CheckboxPreferenceStartAction(
         }
     }
     Checkbox(
-        modifier = Modifier
-            .padding(end = 5.dp),
+        modifier = modifier.padding(end = 5.dp),
         state = ToggleableState(checked),
         onClick = onClick,
         enabled = enabled,
@@ -216,6 +230,7 @@ private fun CheckboxPreferenceStartAction(
 
 @Composable
 private fun CheckboxPreferenceEndAction(
+    modifier: Modifier,
     checked: Boolean,
     onCheckedChange: ((Boolean) -> Unit)?,
     enabled: Boolean,
@@ -232,7 +247,7 @@ private fun CheckboxPreferenceEndAction(
         }
     }
     Checkbox(
-        modifier = Modifier.padding(end = endMargin),
+        modifier = modifier.padding(end = endMargin),
         state = ToggleableState(checked),
         onClick = onClick,
         enabled = enabled,

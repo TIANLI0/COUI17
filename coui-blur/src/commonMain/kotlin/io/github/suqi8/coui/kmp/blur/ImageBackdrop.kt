@@ -7,13 +7,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
@@ -35,6 +36,7 @@ import io.github.suqi8.coui.kmp.blur.internal.InverseLayerScope
  * @property image The captured window, possibly downscaled.
  * @property sourceSize Size of the captured window in pixels; [image] is stretched back to it.
  * @property sourceOriginOnScreen Top-left corner of the captured window on screen, in pixels.
+ * @param underlay Capture behind a translucent host window, in the same screen coordinate space.
  */
 @InternalCouiBlurApi
 @Stable
@@ -42,7 +44,11 @@ class ImageBackdrop(
     image: ImageBitmap,
     sourceSize: IntSize,
     sourceOriginOnScreen: Offset,
+    private val underlay: ImageBackdrop?,
 ) : Backdrop {
+
+    constructor(image: ImageBitmap, sourceSize: IntSize, sourceOriginOnScreen: Offset) :
+        this(image, sourceSize, sourceOriginOnScreen, underlay = null)
 
     /** The current capture. Read while drawing, so replacing it redraws the consumers only. */
     var image: ImageBitmap by mutableStateOf(image)
@@ -81,11 +87,10 @@ class ImageBackdrop(
         val coordinates = coordinates ?: return
         if (!coordinates.isAttached) return
 
-        val offset = try {
-            coordinates.positionOnScreen() - sourceOriginOnScreen
-        } catch (_: Exception) {
-            coordinates.positionInWindow()
-        }
+        val screenPosition = runCatching { coordinates.positionOnScreen() }.getOrDefault(Offset.Unspecified)
+        if (!screenPosition.isSpecified) return
+        val captureOrigin = sourceOriginOnScreen
+        val offset = screenPosition - captureOrigin
 
         val consumerSize = (density as? BackdropEffectScope)?.size ?: size
 
@@ -109,6 +114,14 @@ class ImageBackdrop(
                 translate(-offset.x, -offset.y)
             }
         }) {
+            drawCapture(captureOrigin)
+        }
+    }
+
+    private fun DrawScope.drawCapture(relativeTo: Offset) {
+        underlay?.let { lower -> with(lower) { drawCapture(relativeTo) } }
+        val offset = sourceOriginOnScreen - relativeTo
+        translate(offset.x, offset.y) {
             drawImage(
                 image = image,
                 srcOffset = IntOffset.Zero,

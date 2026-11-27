@@ -18,7 +18,6 @@ import io.github.suqi8.coui.kmp.basic.PreciseClickState
 import io.github.suqi8.coui.kmp.blur.Backdrop
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.layout.ListPopupLayout
-import io.github.suqi8.coui.kmp.layout.popupPhysicalDensity
 import io.github.suqi8.coui.kmp.utils.COUIPopupUtils.Companion.PopupLayout
 
 /**
@@ -64,10 +63,8 @@ fun OverlayListPopup(
     // Publishing it unconditionally made every menu opened from a page sample that page's wallpaper
     // layer instead, and a white page frosted into the wallpaper's cyan and yellow.
     val backdrop = LocalBackdrop.current
-    // Same reason for the density: ColorOS menus render at the panel's density, not the display-size
-    // override a third-party app follows, so the popup must re-provide it where it actually composes.
+    // Keep the caller density when the popup is composed in a different host.
     val density = LocalDensity.current
-    val popupDensity = remember(density) { popupPhysicalDensity(density) }
     ListPopupLayout(
         show = show,
         popupHost = { visible, passTouches, hostContent ->
@@ -82,7 +79,7 @@ fun OverlayListPopup(
                 renderInRootScaffold = renderInRootScaffold,
                 passTouches = passTouches,
             ) {
-                CompositionLocalProvider(LocalDensity provides popupDensity) {
+                CompositionLocalProvider(LocalDensity provides density) {
                     PopupBackdrop(hostBackdrop = backdrop) {
                         hostContent()
                     }

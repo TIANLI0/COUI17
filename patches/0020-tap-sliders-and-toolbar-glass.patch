@@ -1,0 +1,254 @@
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingToolbar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingToolbar.kt
+index 0d57074..4db31e9 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingToolbar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/BottomFloatingToolbar.kt
+@@ -261,7 +261,7 @@ fun BottomFloatingToolbarGroup(
+     val systemCaustic = rememberPlatformCausticShadowRenderer() != null
+     val density = LocalDensity.current
+     val cornerRadiusPx = with(density) { cornerRadius.toPx() }
+-    val blurRadius = with(density) { (BottomFloatingToolbarDefaults.BlurRadius / TEXTURE_BLUR_SIGMA_SCALE).toDp().value }
++    val blurRadius = BottomFloatingToolbarDefaults.blurRadiusDp()
+     val itemCount = remember { intArrayOf(0) }
+     val height = BottomFloatingToolbarDefaults.MenuViewHeight
+     var capsuleWidthPx by remember { mutableIntStateOf(0) }
+@@ -620,6 +620,10 @@ object BottomFloatingToolbarDefaults {
+      */
+     val BlurRadius = 30f
+ 
++    /** Radius in the Compose texture engine's dp units for the floating-toolbar material. */
++    @Composable
++    fun blurRadiusDp(): Float = with(LocalDensity.current) { (BlurRadius / TEXTURE_BLUR_SIGMA_SCALE).toDp().value }
++
+     /**
+      * The tint layers laid over the blurred backdrop in the light theme, in [textureBlur] list
+      * order: `#4D333333` in `ColorDodge` first, then `#66F5F5F5` in `Luminosity`, matching the
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt
+index c54233f..47dcf32 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt
+@@ -11,6 +11,7 @@ import androidx.compose.animation.core.spring
+ import androidx.compose.animation.core.tween
+ import androidx.compose.foundation.Canvas
+ import androidx.compose.foundation.gestures.Orientation
++import androidx.compose.foundation.gestures.detectTapGestures
+ import androidx.compose.foundation.gestures.draggable
+ import androidx.compose.foundation.gestures.rememberDraggableState
+ import androidx.compose.foundation.hoverable
+@@ -113,7 +114,7 @@ import kotlin.math.roundToInt
+  * @param startFromMiddle Whether the active track grows from the middle of the bar towards the
+  *   thumb instead of from the start edge (COUI couiSeekBarStartMiddle). New in 1.2.0.
+  * @param moveByFinger Whether the thumb follows the finger's displacement instead of jumping to the
+- *   finger's position (COUI `MOVE_BY_FINGER`; the default is `MOVE_BY_DISTANCE`). New in 1.2.0.
++ *   finger's position during a drag. A tap always selects the tapped position (COUI `MOVE_BY_FINGER`; the default is `MOVE_BY_DISTANCE`). New in 1.2.0.
+  */
+ @Composable
+ fun Slider(
+@@ -461,6 +462,15 @@ fun VerticalSlider(
+                                 }
+                             },
+                         )
++                        .pointerInput(reverseDirection, fractionToValueVertical) {
++                            detectTapGestures { tap ->
++                                flingJob?.cancel()
++                                val visual = verticalVisualFraction(tap.y, layoutHeight, layoutWidth)
++                                val fraction = if (reverseDirection) visual else 1f - visual
++                                onValueChangeState(fractionToValueVertical(fraction))
++                                onValueChangeFinishedState?.invoke()
++                            }
++                        }
+                         .indication(interactionSource, null)
+                 } else {
+                     Modifier
+@@ -856,6 +866,27 @@ fun RangeSlider(
+                                 onValueChangeFinishedState?.invoke()
+                             },
+                         )
++                        .pointerInput(isRtl, restingInsetPx, valueRange, fractionToValueRange) {
++                            detectTapGestures { tap ->
++                                val span = valueRange.endInclusive - valueRange.start
++                                val start = currentStartValue.coerceIn(valueRange)
++                                val end = currentEndValue.coerceIn(valueRange)
++                                val visual = horizontalVisualFraction(tap.x, layoutWidth, restingInsetPx)
++                                val target = fractionToValueRange(if (isRtl) 1f - visual else visual)
++                                val picksStart = when {
++                                    target < start -> true
++                                    target > end -> false
++                                    else -> rangePressPicksStart(
++                                        tap.x, layoutWidth, restingInsetPx,
++                                        (start - valueRange.start) / span, (end - valueRange.start) / span,
++                                        isRtl, lastDraggedIsStart,
++                                    )
++                                }
++                                lastDraggedIsStart = picksStart
++                                onValueChangeState(if (picksStart) target.coerceAtMost(end)..end else start..target.coerceAtLeast(start))
++                                onValueChangeFinishedState?.invoke()
++                            }
++                        }
+                         .indication(interactionSource, null)
+                 } else {
+                     Modifier
+@@ -1987,6 +2018,9 @@ object SliderDefaults {
+      */
+     val MinHeight = 20.dp
+ 
++    /** Distance from the edge to the first and last stops at the default track height. */
++    val HorizontalTrackInset = 14.dp
++
+     /**
+      * The minimum height of the slider's touch target (COUI `couiSeekBarMinHeight`): the track is
+      * 20dp but the view is 36dp tall, so the extra 16dp is tappable.
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderMotion.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderMotion.kt
+index 924b075..b4d2a8c 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderMotion.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderMotion.kt
+@@ -4,7 +4,7 @@
+ // SPDX-License-Identifier: MPL-2.0
+ package io.github.suqi8.coui.kmp.kit.slider
+ 
+-// Ported from COUI-Kit (ItosEO/COUI-Kit@8a09da4) coui/src/main/java/com/itos/coui/slider/CouiSliderMotion.kt. Extended with custom keypoints, magnet snapping, moveByFinger guard, and haptic controls.
++// Ported from COUI-Kit (ItosEO/COUI-Kit@8a09da4) coui/src/main/java/com/itos/coui/slider/CouiSliderMotion.kt. Extended with custom keypoints, magnet snapping, tap handling, and haptic controls.
+ 
+ import androidx.compose.animation.core.CubicBezierEasing
+ import androidx.compose.runtime.getValue
+@@ -39,7 +39,6 @@ internal class CouiSliderMotion(
+     private val keyPointFractions: FloatArray = floatArrayOf(),
+     private val magnetThreshold: Float = 0f,
+     private val hapticEffect: Int = 1,
+-    private val moveByFinger: Boolean = false,
+     private val feedback: (Int, Boolean) -> Unit,
+ ) {
+     private val intervals = steps + 1
+@@ -151,22 +150,11 @@ internal class CouiSliderMotion(
+         releaseAppearance()
+         pressed = false
+         if (!dragging) {
+-            if (!moveByFinger) {
+-                return
+-            }
+-            val target = quantize(normalizePosition(fingerX))
+-            if (section) {
+-                setFraction(target, vibrate = true)
+-                animateSection(target * length, 200L)
+-            } else {
+-                if (target != fraction && (target == 0f || target == 1f) && hapticEffect != 0) feedback(306, false)
+-                position.animateTo(target * length, 0.3f, onFrame = {
+-                    setFraction(normalizePosition(it), vibrate = false, truncate = true)
+-                }) {
+-                    setFraction(target, vibrate = false)
+-                    onValueChangeFinished()
+-                }
+-            }
++            // Report the selected value once. The spring only animates the drawn thumb, so a
++            // second tap cannot cancel a callback the caller has yet to receive.
++            setFraction(normalizePosition(fingerX), vibrate = true)
++            position.animateTo(fraction * length, response = 0.3f, minimumChange = length / 1000f)
++            onValueChangeFinished()
+             return
+         }
+         dragging = false
+@@ -357,11 +345,10 @@ internal class CouiSliderMotion(
+         glitter.animateTo(0f, 0.6f, velocity = abs(velocity))
+     }
+ 
+-    private fun setFraction(next: Float, vibrate: Boolean, truncate: Boolean = false) {
++    private fun setFraction(next: Float, vibrate: Boolean) {
+         val raw = next.coerceIn(0f, 1f)
+         val selected = if (steps > 0 || section) {
+-            val i = if (truncate) (raw * intervals).toInt() else index(raw)
+-            i.toFloat() / intervals
++            index(raw).toFloat() / intervals
+         } else {
+             resolveFraction(raw)
+         }
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderRenderer.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderRenderer.kt
+index 65979a3..cbcf732 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderRenderer.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/CouiSliderRenderer.kt
+@@ -6,6 +6,7 @@ package io.github.suqi8.coui.kmp.kit.slider
+ 
+ // Ported from COUI-Kit (ItosEO/COUI-Kit@8a09da4) coui/src/main/java/com/itos/coui/slider/CouiSliderRenderer.kt. Extended with secondary progress, middle fill, custom keypoints, and visibility options.
+ 
++import io.github.suqi8.coui.kmp.basic.SliderDefaults
+ import androidx.compose.runtime.Immutable
+ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.geometry.Rect
+@@ -108,7 +109,7 @@ internal class CouiSliderRenderer(
+         val defaultTrackHeight = 20f * density
+         val trackHeight = customTrackHeight ?: defaultTrackHeight
+         val scale = (trackHeight / defaultTrackHeight).coerceAtLeast(0.1f)
+-        val start = 14f * density * scale
++        val start = SliderDefaults.HorizontalTrackInset.value * density * scale
+         val thumbX = start + length * if (rtl) 1f - visualFraction else visualFraction
+         val trackRadius = trackHeight / 2f
+         val backgroundRadius = backgroundHeight(heightFraction, scale, trackHeight) / 2f
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/Slider.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/Slider.kt
+index 852a1b4..77a9ca5 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/Slider.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/slider/Slider.kt
+@@ -123,7 +123,7 @@ internal fun CouiKitSlider(
+     val scope = rememberCoroutineScope()
+     val onChange by rememberUpdatedState(onValueChange)
+     val onFinished by rememberUpdatedState(onValueChangeFinished)
+-    val motion = remember(valueRange, steps, density, keyPointFractions, magnetThreshold, hapticCode, moveByFinger, scope) {
++    val motion = remember(valueRange, steps, density, keyPointFractions, magnetThreshold, hapticCode, scope) {
+         CouiSliderMotion(
+             scope = scope,
+             range = valueRange,
+@@ -136,7 +136,6 @@ internal fun CouiKitSlider(
+             keyPointFractions = keyPointFractions,
+             magnetThreshold = magnetThreshold,
+             hapticEffect = hapticCode,
+-            moveByFinger = moveByFinger,
+         ) { code, _ ->
+             performSliderHaptic(haptic, code)
+         }
+@@ -168,7 +167,7 @@ internal fun CouiKitSlider(
+     val span = valueRange.endInclusive - valueRange.start
+     val keyIncrement = span / if (steps > 0 || showTickMarks) steps + 1 else 100
+     val scale = (height / 20.dp).coerceAtLeast(0.1f)
+-    val capInset = 14f * density * scale
++    val capInset = SliderDefaults.HorizontalTrackInset.value * density * scale
+     var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+     Box(
+         modifier
+@@ -203,7 +202,7 @@ internal fun CouiKitSlider(
+             }
+             .focusable(interactive)
+             .onSizeChanged { motion.resize((it.width - 2f * capInset).coerceAtLeast(0f)) }
+-            .pointerInput(motion, touch, interactive, effectiveReverse, capInset) {
++            .pointerInput(motion, touch, interactive, effectiveReverse, capInset, moveByFinger) {
+                 if (!interactive) return@pointerInput
+                 awaitEachGesture {
+                     val down = awaitFirstDown()
+@@ -218,9 +217,12 @@ internal fun CouiKitSlider(
+                         val local = x - pointerOffset - touch.translationX.value - capInset
+                         return if (effectiveReverse) motion.length - local else local
+                     }
++                    val touchStart = fingerX(down.position.x)
++                    val thumbStart = motion.fraction * motion.length
++                    val dragAdjustment = if (moveByFinger) thumbStart - touchStart else 0f
+                     try {
+                         coordinates?.takeIf { it.isAttached }?.let { tracker.add(down, it, start = true) }
+-                        motion.press(fingerX(down.position.x))
++                        motion.press(touchStart + dragAdjustment)
+                         touch.begin(down.position, size)
+                         while (true) {
+                             val event = awaitPointerEvent()
+@@ -237,7 +239,7 @@ internal fun CouiKitSlider(
+                             }
+                             if (tracked.isConsumed) break
+                             if (!tracked.pressed) {
+-                                val local = fingerX(tracked.position.x)
++                                val local = fingerX(tracked.position.x) + if (dragging) dragAdjustment else 0f
+                                 val inside = tracked.position.x in 0f..size.width.toFloat() &&
+                                     tracked.position.y in 0f..size.height.toFloat()
+                                 val xVelocityPxPerSec = (tracker.releaseVelocity().x / RELEASE_VELOCITY_SCALE)
+@@ -263,7 +265,7 @@ internal fun CouiKitSlider(
+                             if (dragging || abs(delta.x) > viewConfiguration.touchSlop) {
+                                 dragging = true
+                                 motion.drag(
+-                                    fingerX(tracked.position.x),
++                                    fingerX(tracked.position.x) + dragAdjustment,
+                                     xVelocityPxPerSec * if (effectiveReverse) -1f else 1f,
+                                 )
+                                 tracked.consume()

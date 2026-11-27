@@ -82,7 +82,7 @@ import io.github.suqi8.coui.kmp.utils.COUIResponsiveUtils
  * band, the outline caustic shadow (or the `level3b` spot shadow) casts the lift, and
  * `setMetaBallChain` melts the three silhouettes together. Every other platform, and any device
  * missing one of those APIs, falls back to the [MetaBallSurface] renderer above.
- * [LocalPlatformBottomBarMaterialEnabled] (default on) and
+ * [LocalPlatformBottomBarMaterialEnabled] (off by default) and
  * [io.github.suqi8.coui.kmp.blur.LocalBlurEnabled] together decide which one runs.
  *
  * @param modifier The modifier to be applied to the bar.

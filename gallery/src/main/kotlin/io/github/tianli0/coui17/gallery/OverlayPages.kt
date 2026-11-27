@@ -18,12 +18,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.BasicComponent
+import io.github.suqi8.coui.kmp.basic.DropdownEntry
+import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.cardListPositionOf
 import io.github.suqi8.coui.kmp.icon.COUIIcons
@@ -32,6 +35,7 @@ import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.preference.ArrowPreference
 import io.github.suqi8.coui.kmp.preference.RadioButtonPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
+import io.github.suqi8.coui.kmp.window.WindowCascadingListPopup
 import io.github.tianli0.coui17.patterns.ActionTone
 import io.github.tianli0.coui17.patterns.ConfirmDialog
 import io.github.tianli0.coui17.patterns.FormDialog
@@ -82,13 +86,26 @@ fun OverlaysPage() {
         actions = {
             Box {
                 ToolbarIcon(COUIIcons.More, tr("更多", "More"), onClick = { menu = true })
-                GlassMenu(
+                WindowCascadingListPopup(
                     show = menu,
-                    onDismiss = { menu = false },
+                    onDismissRequest = { menu = false },
                     entries = listOf(
-                        MenuEntry(tr("刷新", "Refresh")) { last = refreshed },
-                        MenuEntry(tr("全选", "Select all")) { last = allSelected },
-                        MenuEntry(tr("删除", "Delete"), danger = true) { confirm = true },
+                        DropdownEntry(
+                            listOf(
+                                DropdownItem(tr("刷新", "Refresh"), onClick = { last = refreshed }),
+                                DropdownItem(
+                                    text = tr("排序方式", "Sort by"),
+                                    children = sorts.mapIndexed { index, label ->
+                                        DropdownItem(label, selected = sort == index, onClick = {
+                                            sort = index
+                                            last = label
+                                        })
+                                    },
+                                ),
+                                DropdownItem(tr("全选", "Select all"), onClick = { last = allSelected }),
+                                DropdownItem(tr("删除", "Delete"), alert = true, onClick = { confirm = true }),
+                            ),
+                        ),
                     ),
                 )
             }
@@ -172,7 +189,7 @@ fun OverlaysPage() {
                     ),
                 )
             }
-            item { Note(tr("菜单开在自己的窗口里，下面垫的是当前页面的模糊快照；右上角的“更多”也是同一个菜单。", "A menu opens in its own window over a blurred snapshot of the page; the More key in the title bar opens the same menu.")) }
+            item { Note(tr("标题栏的“更多”包含两级排序菜单，返回一次可收起子菜单。", "More in the toolbar contains a sorting submenu. Back collapses it first.")) }
             item { SectionHeader(tr("全屏页面", "Full-screen page")) }
             item {
                 GroupCard {
@@ -219,7 +236,22 @@ fun OverlaysPage() {
         },
         onDismiss = { rename = false },
     ) {
-        TextInput(value = newName, onValueChange = { newName = it }, label = tr("名称", "Name"), showClearButton = true)
+        var nameMenu by remember { mutableStateOf(false) }
+        val untitled = tr("未命名", "Untitled")
+        Column {
+            Box(Modifier.padding(bottom = 8.dp)) {
+                SmallButton(tr("名称选项", "Name options"), onClick = { nameMenu = true })
+                GlassMenu(
+                    show = nameMenu,
+                    entries = listOf(
+                        MenuEntry(tr("使用默认名称", "Use default name")) { newName = untitled },
+                        MenuEntry(tr("清除名称", "Clear name"), enabled = newName.isNotEmpty()) { newName = "" },
+                    ),
+                    onDismiss = { nameMenu = false },
+                )
+            }
+            TextInput(value = newName, onValueChange = { newName = it }, label = tr("名称", "Name"), showClearButton = true)
+        }
     }
 
     var name by rememberSaveable { mutableStateOf("") }

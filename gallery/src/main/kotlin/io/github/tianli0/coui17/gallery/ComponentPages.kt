@@ -32,8 +32,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.Badge
 import io.github.suqi8.coui.kmp.basic.BasicComponent
@@ -47,14 +49,18 @@ import io.github.suqi8.coui.kmp.basic.ExpandArrow
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.InfiniteProgressIndicator
+import io.github.suqi8.coui.kmp.basic.IntentSeekBar
+import io.github.suqi8.coui.kmp.basic.NumberPicker
 import io.github.suqi8.coui.kmp.basic.LinearProgressIndicator
 import io.github.suqi8.coui.kmp.basic.RadioButton
+import io.github.suqi8.coui.kmp.basic.RangeSlider
 import io.github.suqi8.coui.kmp.basic.Slider
 import io.github.suqi8.coui.kmp.basic.Stepper
 import io.github.suqi8.coui.kmp.basic.Switch
 import io.github.suqi8.coui.kmp.basic.TabRow
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
+import io.github.suqi8.coui.kmp.basic.VerticalSlider
 import io.github.suqi8.coui.kmp.basic.cardListPositionOf
 import io.github.suqi8.coui.kmp.blur.isRuntimeShaderSupported
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
@@ -286,6 +292,10 @@ fun SelectionPage(onBack: () -> Unit) {
     var brightness by rememberSaveable { mutableFloatStateOf(0.6f) }
     var size by rememberSaveable { mutableFloatStateOf(2f) }
     var copies by rememberSaveable { mutableIntStateOf(1) }
+    var playback by rememberSaveable { mutableFloatStateOf(25f) }
+    var picker by rememberSaveable { mutableIntStateOf(4) }
+    var range by remember { mutableStateOf(2f..8f) }
+    var vertical by rememberSaveable { mutableFloatStateOf(5f) }
     Page(title = tr("选择控件", "Selection"), onBack = onBack, immersive = true) {
         PageList {
             item { SectionHeader(tr("开关", "Switch")) }
@@ -347,6 +357,54 @@ fun SelectionPage(onBack: () -> Unit) {
                         Spacer(Modifier.height(20.dp))
                         Caption(tr("字号：第 ${size.toInt() + 1} 档（带吸附刻度）", "Font size: step ${size.toInt() + 1} (with key points)"))
                         Slider(value = size, onValueChange = { size = it }, valueRange = 0f..4f, steps = 3, showKeyPoints = true)
+                    }
+                }
+            }
+            item { SectionHeader(tr("播放进度", "Playback")) }
+            item {
+                GroupCard {
+                    Column(Modifier.padding(CardContentPadding)) {
+                        Caption(tr("已播放 ${playback.toInt()}%，已缓冲 75%", "Played ${playback.toInt()}%, buffered 75%"))
+                        IntentSeekBar(
+                            value = playback,
+                            onValueChange = { playback = it },
+                            valueRange = 0f..100f,
+                            secondaryProgress = 75f,
+                            steps = 3,
+                            showThumb = true,
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Caption(tr("从右到左", "Right to left"))
+                        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                            IntentSeekBar(
+                                value = playback,
+                                onValueChange = { playback = it },
+                                valueRange = 0f..100f,
+                                secondaryProgress = 75f,
+                                steps = 3,
+                                showThumb = true,
+                            )
+                        }
+                    }
+                }
+            }
+            item {
+                GroupCard {
+                    Column(Modifier.padding(CardContentPadding), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Caption(tr("范围 ${range.start.toInt()}–${range.endInclusive.toInt()}", "Range ${range.start.toInt()}–${range.endInclusive.toInt()}"))
+                        RangeSlider(value = range, onValueChange = { range = it }, valueRange = 0f..10f, steps = 9)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            VerticalSlider(value = vertical, onValueChange = { vertical = it }, valueRange = 0f..10f, steps = 9, modifier = Modifier.height(120.dp))
+                            Caption(tr("垂直 ${vertical.toInt()}", "Vertical ${vertical.toInt()}"))
+                        }
+                    }
+                }
+            }
+            item { SectionHeader(tr("数字选择器", "Number picker")) }
+            item {
+                GroupCard {
+                    Box(Modifier.fillMaxWidth().padding(CardContentPadding), contentAlignment = Alignment.Center) {
+                        NumberPicker(value = picker, onValueChange = { picker = it })
                     }
                 }
             }

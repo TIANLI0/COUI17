@@ -6,6 +6,7 @@ package io.github.suqi8.coui.kmp.kit.slider
 
 // Ported from COUI-Kit (ItosEO/COUI-Kit@8a09da4) coui/src/main/java/com/itos/coui/slider/CouiSliderRenderer.kt. Extended with secondary progress, middle fill, custom keypoints, and visibility options.
 
+import io.github.suqi8.coui.kmp.basic.SliderDefaults
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -108,7 +109,7 @@ internal class CouiSliderRenderer(
         val defaultTrackHeight = 20f * density
         val trackHeight = customTrackHeight ?: defaultTrackHeight
         val scale = (trackHeight / defaultTrackHeight).coerceAtLeast(0.1f)
-        val start = 14f * density * scale
+        val start = SliderDefaults.HorizontalTrackInset.value * density * scale
         val thumbX = start + length * if (rtl) 1f - visualFraction else visualFraction
         val trackRadius = trackHeight / 2f
         val backgroundRadius = backgroundHeight(heightFraction, scale, trackHeight) / 2f

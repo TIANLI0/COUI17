@@ -13,7 +13,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -72,10 +75,10 @@ fun RadioButtonPreference(
     val currentOnClick by rememberUpdatedState(onClick)
 
     BasicComponent(
-        // `COUIMarkPreference.onBindViewHolder` turns the row into an action labelled
-        // `coui_accessibility_select` and drops it once the tail mark is checked, so the reader knows
-        // the row is already selected.
-        modifier = modifier.semantics { this.selected = selected },
+        modifier = modifier.semantics {
+            role = Role.RadioButton
+            this.selected = selected
+        },
         insideMargin = insideMargin,
         cardListPosition = cardListPosition,
         title = title,
@@ -129,10 +132,7 @@ fun RadioButtonPreference(
             }
         },
         bottomAction = bottomAction,
-        onClick = {
-            currentOnClick.takeIf { enabled }?.invoke()
-        },
-        onClickLabel = RadioButtonPreferenceDefaults.SelectActionLabel,
+        onClick = if (onClick != null) { { currentOnClick?.invoke() } } else null,
         role = Role.RadioButton,
         holdDownState = holdDownState,
         enabled = enabled,
@@ -155,8 +155,8 @@ private fun RadioButtonPreferenceStartAction(
         }
     }
     RadioButton(
-        modifier = Modifier
-            .padding(end = 5.dp),
+        modifier = Modifier.padding(end = 5.dp)
+            .focusProperties { canFocus = false }.clearAndSetSemantics {},
         selected = selected,
         onClick = wrappedOnClick,
         enabled = enabled,
@@ -180,6 +180,7 @@ private fun RadioButtonPreferenceEndAction(
         }
     }
     RadioButton(
+        modifier = Modifier.focusProperties { canFocus = false }.clearAndSetSemantics {},
         selected = selected,
         onClick = wrappedOnClick,
         enabled = enabled,

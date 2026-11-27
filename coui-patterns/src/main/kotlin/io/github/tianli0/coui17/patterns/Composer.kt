@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -46,6 +45,7 @@ import io.github.suqi8.coui.kmp.basic.RotatingProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Send
+import io.github.suqi8.coui.kmp.squircle.SquircleShape
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
@@ -58,6 +58,9 @@ data class InputPillState(val enabled: Boolean, val sendEnabled: Boolean, val bu
 
 /** The diameter of a composer key and the height of its one-line field: coui's toolbar key. */
 val ComposerKeySize = 40.dp
+
+/** Continuous corners for the floating composer field in its single-line and expanded states. */
+val ComposerFieldShape = SquircleShape(ComposerKeySize / 2)
 
 /** The gap between toolbar keys (coui `TopAppBarDefaults.ActionMenuItemSpacing`). */
 val ComposerKeyGap = 10.dp
@@ -91,7 +94,7 @@ fun InputPill(
             Modifier
                 .weight(1f)
                 .heightIn(min = ComposerKeySize)
-                .glassSurface(RoundedCornerShape(ComposerKeySize / 2))
+                .glassSurface(ComposerFieldShape)
                 .padding(horizontal = 16.dp, vertical = 9.dp),
             contentAlignment = Alignment.CenterStart,
         ) {

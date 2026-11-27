@@ -49,18 +49,14 @@ data class MenuEntry(
  * window's side margins (COUI `PreciseClickHelper`); keyboard and accessibility opens, which record
  * no point, fall back to the anchor.
  *
- * The popup lives in its own window, where there is no page to blur, so it is handed a blurred
- * snapshot of the page it opened over ([rememberPopupGlass]); without one (blur off, below
- * Android 8) it keeps COUI's opaque surface.
+ * The popup samples its host window while open and during its transition. It uses the opaque
+ * surface until the first frame arrives or when backdrop blur is unavailable.
  */
 @Composable
 fun GlassMenu(show: Boolean, entries: List<MenuEntry>, onDismiss: () -> Unit, touch: PreciseClickState? = null) {
-    val glass = rememberPopupGlass(show)
     WindowListPopup(
         show = show,
         onDismissRequest = onDismiss,
-        staticBackdrop = glass?.image,
-        staticBackdropWindowSize = glass?.windowSize ?: IntSize.Zero,
         preciseClickState = touch,
     ) {
         ListPopupColumn {

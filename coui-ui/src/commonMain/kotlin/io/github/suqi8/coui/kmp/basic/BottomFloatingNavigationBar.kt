@@ -98,6 +98,10 @@ import io.github.suqi8.coui.kmp.blur.BlurBlendMode
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.LocalBlurEnabled
 import io.github.suqi8.coui.kmp.blur.isBlurEnabled
+import io.github.suqi8.coui.kmp.input.COUILongPressSelectionState
+import io.github.suqi8.coui.kmp.input.couiLongPressSelection
+import io.github.suqi8.coui.kmp.input.couiLongPressSelectionItem
+import io.github.suqi8.coui.kmp.input.rememberCOUILongPressSelectionState
 import io.github.suqi8.coui.kmp.squircle.isSquircleEnabled
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.suqi8.coui.kmp.utils.COUIResponsiveUtils
@@ -162,7 +166,7 @@ import kotlin.math.roundToInt
  * band, the outline caustic shadow (or the `level3b` spot shadow) casts the lift, and
  * `setMetaBallChain` melts the expansion view into the capsule. Every other platform, and any
  * device missing one of those APIs, falls back to the [MetaBallSurface] renderer above.
- * [LocalPlatformBottomBarMaterialEnabled] (default on) and
+ * [LocalPlatformBottomBarMaterialEnabled] (off by default) and
  * [io.github.suqi8.coui.kmp.blur.LocalBlurEnabled] together decide which one runs.
  *
  * @param modifier The modifier to be applied to the bar.
@@ -304,12 +308,16 @@ internal fun FloatingCapsuleRow(
     val itemMaxWidthPx = with(density) { metrics.itemMaxWidth.roundToPx() }
     val capsuleHeightPx = with(density) { BottomFloatingNavigationBarDefaults.BarHeight.roundToPx() }
     val reservePx = with(density) { trailingReserve.roundToPx() }
+    val selection = rememberCOUILongPressSelectionState()
 
     Layout(
         // getDisplayFrame: the menu view is the bar's popup barrier.
-        modifier = modifier.popupBottomBarrier(),
+        modifier = modifier.popupBottomBarrier().couiLongPressSelection(selection),
         content = {
-            CompositionLocalProvider(LocalFloatingMenuTouchOwner provides true) { BottomFloatingCapsuleRowScope.content() }
+            CompositionLocalProvider(
+                LocalFloatingMenuTouchOwner provides true,
+                LocalFloatingTabSelection provides selection,
+            ) { BottomFloatingCapsuleRowScope.content() }
         },
     ) { measurables, constraints ->
         val count = measurables.size
@@ -365,6 +373,7 @@ internal fun FloatingCapsuleRow(
  * alignment-line entry points are inert for the same reason.
  */
 internal val LocalFloatingMenuTouchOwner = staticCompositionLocalOf { false }
+private val LocalFloatingTabSelection = staticCompositionLocalOf<COUILongPressSelectionState?> { null }
 
 private object BottomFloatingCapsuleRowScope : RowScope {
     override fun Modifier.weight(weight: Float, fill: Boolean): Modifier = this
@@ -871,12 +880,19 @@ fun RowScope.BottomFloatingNavigationBarItem(
 ) {
     val colorScheme = COUITheme.colorScheme
     val interactionSource = remember { MutableInteractionSource() }
+    val selection = LocalFloatingTabSelection.current
+    val selectionKey = remember { Any() }
+    val preview = selection?.previewKey
+    val visuallySelected = if (preview != null) preview == selectionKey else selected
+    val selectionModifier = if (selection != null) {
+        Modifier.couiLongPressSelectionItem(selection, selectionKey, enabled && overflowMenu == null, onClick)
+    } else Modifier
 
     // COUI item label/icon colors: couiColorLabelTertiary / couiColorLabelPrimary /
     // couiColorLabelPrimaryVariant. The same color tints both the icon and the label.
     val tint = when {
         !enabled -> colorScheme.onSurfaceVariantActions
-        selected -> colorScheme.onSurface
+        visuallySelected -> colorScheme.onSurface
         else -> colorScheme.labelPrimaryVariant
     }
 
@@ -910,6 +926,7 @@ fun RowScope.BottomFloatingNavigationBarItem(
             .height(BottomFloatingNavigationBarDefaults.ItemHeight)
             .widthIn(max = LocalBottomFloatingNavigationBarMetrics.current.itemMaxWidth)
             .then(itemTouchModifier)
+            .then(selectionModifier)
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -954,7 +971,7 @@ fun RowScope.BottomFloatingNavigationBarItem(
                             BottomFloatingNavigationBarDefaults.IconSize
                         },
                     ),
-                    imageVector = selectedIcon.takeIf { selected } ?: icon,
+                    imageVector = selectedIcon.takeIf { visuallySelected } ?: icon,
                     contentDescription = label,
                     colorFilter = ColorFilter.tint(tint),
                 )

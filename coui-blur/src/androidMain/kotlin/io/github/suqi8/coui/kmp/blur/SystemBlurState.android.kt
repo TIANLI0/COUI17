@@ -55,32 +55,36 @@ private fun obtainPlatformBlurState(appContext: Context): MutableState<Boolean> 
 }
 
 private fun installObserver(appContext: Context, state: MutableState<Boolean>) {
-    runCatching {
-        // The settings are process-wide, so the observer lives as long as the process does.
-        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
-            override fun onChange(selfChange: Boolean) {
-                state.value = readBlurEnabled(appContext)
-            }
+    // The settings are process-wide, so the observer lives as long as the process does.
+    val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            state.value = readBlurEnabled(appContext)
         }
-        val resolver = appContext.contentResolver
-        resolver.registerContentObserver(Settings.System.getUriFor(MATERIAL_BLUR), false, observer)
-        resolver.registerContentObserver(Settings.System.getUriFor(SUPER_POWER_SAVE_MODE), false, observer)
-        resolver.registerContentObserver(Settings.Global.getUriFor(LOW_POWER_MODE), false, observer)
-        resolver.registerContentObserver(Settings.Global.getUriFor(DISABLE_WINDOW_BLURS), false, observer)
+    }
+    val resolver = appContext.contentResolver
+    for (uri in listOf(
+        Settings.Global.getUriFor(LOW_POWER_MODE),
+        Settings.Global.getUriFor(DISABLE_WINDOW_BLURS),
+        Settings.System.getUriFor(MATERIAL_BLUR),
+        Settings.System.getUriFor(SUPER_POWER_SAVE_MODE),
+    )) {
+        // An OEM setting may be unreadable to third-party apps. It must not prevent the
+        // Android settings from being observed.
+        runCatching { resolver.registerContentObserver(uri, false, observer) }
     }
 }
 
-/**
- * `COUIMaterialStateManager.updateBlurStates`: blur needs the material switch on and neither
- * power-saving mode active. A ROM without the switch (anything but ColorOS) has no setting at all,
- * which reads as "allowed" here so the effects keep working off ColorOS.
- */
-private fun readBlurEnabled(context: Context): Boolean = runCatching {
+private fun readBlurEnabled(context: Context): Boolean {
     val resolver = context.contentResolver
-    val switch = Settings.System.getString(resolver, MATERIAL_BLUR)
-    val switchOn = switch == null || switch.trim() == "1"
-    val lowPower = Settings.Global.getInt(resolver, LOW_POWER_MODE, 0) == 1
-    val superPowerSave = Settings.System.getInt(resolver, SUPER_POWER_SAVE_MODE, 0) == 1
-    val windowBlursDisabled = Settings.Global.getInt(resolver, DISABLE_WINDOW_BLURS, 0) == 1
-    switchOn && !lowPower && !superPowerSave && !windowBlursDisabled
-}.getOrDefault(true)
+    val lowPower = runCatching { Settings.Global.getInt(resolver, LOW_POWER_MODE, 0) == 1 }.getOrDefault(false)
+    val windowBlursDisabled = runCatching {
+        Settings.Global.getInt(resolver, DISABLE_WINDOW_BLURS, 0) == 1
+    }.getOrDefault(false)
+    if (lowPower || windowBlursDisabled) return false
+
+    val switch = runCatching { Settings.System.getString(resolver, MATERIAL_BLUR) }.getOrNull()
+    val superPowerSave = runCatching {
+        Settings.System.getInt(resolver, SUPER_POWER_SAVE_MODE, 0) == 1
+    }.getOrDefault(false)
+    return (switch == null || switch.trim() == "1") && !superPowerSave
+}

@@ -22,10 +22,8 @@ import io.github.suqi8.coui.kmp.basic.TextFieldMode
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
- * Whether content sits directly on the page colour (a [Page] body, a [PanelSheet]) rather than on a
- * card or a dialog. A COUI rectangle field is a transparent box with a hairline outline, made for
- * white surfaces; on the grey page colour it all but disappears, so [TextInput] fills itself with
- * the card colour there. [Page] and [PanelSheet] provide true, [GroupCard] and [FormDialog] false.
+ * Whether [TextInput] uses the filled, rounded variant shared by [Page], [PanelSheet] and
+ * [FormDialog]. [GroupCard] uses the compact outlined variant against its own fill.
  */
 val LocalOnPageColor = staticCompositionLocalOf { false }
 
@@ -46,11 +44,11 @@ fun TextInput(
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
-    /** The fill of the field; by default the card colour on the page colour, none on a card or dialog. */
+    /** The fill of the field; by default the card colour on the page colour, transparent inside a card. */
     containerColor: Color = if (LocalOnPageColor.current) COUITheme.colorScheme.surfaceContainer else Color.Transparent,
     /**
      * On the page colour the field is a card among the group cards and takes their corner radius;
-     * inside a card or a dialog it keeps COUI's own field radius.
+     * inside a card it keeps COUI's own field radius.
      */
     cornerRadius: Dp = if (LocalOnPageColor.current) PageDefaults.FieldCornerRadius else TextFieldDefaults.CornerRadius,
     /** A password field: dots, with the eye key that reveals the text. */

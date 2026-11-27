@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package io.github.suqi8.coui.kmp.kit.slider
 
-// Ported from COUI-Kit (ItosEO/COUI-Kit@8a09da4) coui/src/main/java/com/itos/coui/slider/CouiSliderMotion.kt. Extended with custom keypoints, magnet snapping, moveByFinger guard, and haptic controls.
+// Ported from COUI-Kit (ItosEO/COUI-Kit@8a09da4) coui/src/main/java/com/itos/coui/slider/CouiSliderMotion.kt. Extended with custom keypoints, magnet snapping, tap handling, and haptic controls.
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.runtime.getValue
@@ -39,7 +39,6 @@ internal class CouiSliderMotion(
     private val keyPointFractions: FloatArray = floatArrayOf(),
     private val magnetThreshold: Float = 0f,
     private val hapticEffect: Int = 1,
-    private val moveByFinger: Boolean = false,
     private val feedback: (Int, Boolean) -> Unit,
 ) {
     private val intervals = steps + 1
@@ -151,22 +150,11 @@ internal class CouiSliderMotion(
         releaseAppearance()
         pressed = false
         if (!dragging) {
-            if (!moveByFinger) {
-                return
-            }
-            val target = quantize(normalizePosition(fingerX))
-            if (section) {
-                setFraction(target, vibrate = true)
-                animateSection(target * length, 200L)
-            } else {
-                if (target != fraction && (target == 0f || target == 1f) && hapticEffect != 0) feedback(306, false)
-                position.animateTo(target * length, 0.3f, onFrame = {
-                    setFraction(normalizePosition(it), vibrate = false, truncate = true)
-                }) {
-                    setFraction(target, vibrate = false)
-                    onValueChangeFinished()
-                }
-            }
+            // Report the selected value once. The spring only animates the drawn thumb, so a
+            // second tap cannot cancel a callback the caller has yet to receive.
+            setFraction(normalizePosition(fingerX), vibrate = true)
+            position.animateTo(fraction * length, response = 0.3f, minimumChange = length / 1000f)
+            onValueChangeFinished()
             return
         }
         dragging = false
@@ -357,11 +345,10 @@ internal class CouiSliderMotion(
         glitter.animateTo(0f, 0.6f, velocity = abs(velocity))
     }
 
-    private fun setFraction(next: Float, vibrate: Boolean, truncate: Boolean = false) {
+    private fun setFraction(next: Float, vibrate: Boolean) {
         val raw = next.coerceIn(0f, 1f)
         val selected = if (steps > 0 || section) {
-            val i = if (truncate) (raw * intervals).toInt() else index(raw)
-            i.toFloat() / intervals
+            index(raw).toFloat() / intervals
         } else {
             resolveFraction(raw)
         }

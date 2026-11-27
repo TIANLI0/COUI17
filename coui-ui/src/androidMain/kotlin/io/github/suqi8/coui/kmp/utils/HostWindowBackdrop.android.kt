@@ -17,15 +17,19 @@ import android.view.ViewTreeObserver
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.window.DialogWindowProvider
 import io.github.suqi8.coui.kmp.blur.Backdrop
 import io.github.suqi8.coui.kmp.blur.ImageBackdrop
 import io.github.suqi8.coui.kmp.blur.InternalCouiBlurApi
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.isBlurEnabled
 
 /**
@@ -50,15 +54,18 @@ private const val CAPTURE_BUFFERS = 3
  */
 @Composable
 internal actual fun rememberHostWindowBackdrop(active: Boolean): State<Backdrop?> {
-    val state = remember { mutableStateOf<Backdrop?>(null) }
     val view = LocalView.current
+    val state = remember(view) { mutableStateOf<Backdrop?>(null) }
+    val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+    val inherited = LocalBackdrop.current
+    val underlay by rememberUpdatedState(if (dialogWindow != null) inherited as? ImageBackdrop else null)
     // The glass needs runtime shaders (API 33); below that, or with blur off, the panel keeps its
     // flat fill and a capture would only cost memory.
     val capture = active && isBlurEnabled() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-    DisposableEffect(capture, view) {
-        val window = if (capture) view.context.findActivity()?.window else null
+    DisposableEffect(capture, view, dialogWindow) {
+        val window = if (capture) dialogWindow ?: view.context.findActivity()?.window else null
         val decor = window?.peekDecorView()
-        if (window == null || decor == null || decor.width <= 0 || decor.height <= 0) {
+        if (window == null || decor == null) {
             return@DisposableEffect onDispose { state.value = null }
         }
         val main = Handler(Looper.getMainLooper())
@@ -66,6 +73,7 @@ internal actual fun rememberHostWindowBackdrop(active: Boolean): State<Backdrop?
         // (and 2 x MIN_CAPTURE_INTERVAL_MS) after the frame that drew the bitmap it overwrites.
         val buffers = arrayOfNulls<Bitmap>(CAPTURE_BUFFERS)
         var next = 0
+        var previousUnderlay: ImageBackdrop? = null
 
         fun bufferFor(w: Int, h: Int): Bitmap {
             val b = buffers[next]
@@ -95,9 +103,14 @@ internal actual fun rememberHostWindowBackdrop(active: Boolean): State<Backdrop?
                     { result ->
                         if (!scheduler.isDisposed && result == PixelCopy.SUCCESS) {
                             val originOffset = Offset(origin[0].toFloat(), origin[1].toFloat())
-                            when (val current = state.value) {
-                                is ImageBackdrop -> current.update(bitmap.asImageBitmap(), sourceSize, originOffset)
-                                else -> state.value = ImageBackdrop(bitmap.asImageBitmap(), sourceSize, originOffset)
+                            val current = state.value
+                            val lower = underlay
+                            val image = bitmap.asImageBitmap()
+                            if (current is ImageBackdrop && previousUnderlay === lower) {
+                                current.update(image, sourceSize, originOffset)
+                            } else {
+                                state.value = ImageBackdrop(image, sourceSize, originOffset, lower)
+                                previousUnderlay = lower
                             }
                         }
                         done()

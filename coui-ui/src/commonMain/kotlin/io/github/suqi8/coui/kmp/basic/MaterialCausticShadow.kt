@@ -69,7 +69,7 @@ internal fun MaterialCausticShadow(
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    val renderer = rememberPlatformCausticShadowRenderer()
+    val renderer = if (LocalPlatformBottomBarMaterialEnabled.current) rememberPlatformCausticShadowRenderer() else null
     // AndroidViewHolder owns a real rectangular layer. Give it the full shadow extent as well
     // as the shape bounds, otherwise its interop parent can truncate the native lower light.
     val outset = 32.dp

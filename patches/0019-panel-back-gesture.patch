@@ -1,0 +1,142 @@
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt
+index 50737d4..8f0a83e 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt
+@@ -128,6 +128,7 @@ import io.github.suqi8.coui.kmp.theme.LocalDismissState
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.channels.Channel
++import kotlinx.coroutines.coroutineScope
+ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.launch
+ import kotlin.coroutines.cancellation.CancellationException
+@@ -210,6 +211,7 @@ internal fun BottomSheetContentLayout(
+     content: @Composable () -> Unit,
+ ) {
+     val animationProgress = remember { Animatable(0f, visibilityThreshold = 0.0001f) }
++    val dimAlpha = remember { mutableFloatStateOf(1f) }
+     val dragOffsetY = remember { Animatable(0f) }
+     val contentScrollOffsetPx = remember { mutableFloatStateOf(0f) }
+     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
+@@ -227,6 +229,7 @@ internal fun BottomSheetContentLayout(
+         if (show) {
+             internalVisible.value = true
+             dragOffsetY.snapTo(0f)
++            dimAlpha.floatValue = 1f
+             contentScrollOffsetPx.floatValue = 0f
+             animationProgress.animateTo(
+                 targetValue = 1f,
+@@ -262,7 +265,6 @@ internal fun BottomSheetContentLayout(
+     if (!show && !internalVisible.value) return
+ 
+     val coroutineScope = rememberCoroutineScope()
+-    val dimAlpha = remember { mutableFloatStateOf(1f) }
+     val dragSnapChannel = remember { Channel<Float>(capacity = Channel.CONFLATED) }
+     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
+ 
+@@ -271,9 +273,10 @@ internal fun BottomSheetContentLayout(
+     }
+ 
+     val resetGesture: suspend () -> Unit = {
+-        dragOffsetY.animateTo(0f, animationSpec = tween(durationMillis = 150))
+-        animate(dimAlpha.floatValue, 1f, animationSpec = tween(durationMillis = 150)) { value, _ ->
+-            dimAlpha.floatValue = value
++        coroutineScope {
++            val restore = tween<Float>(durationMillis = 150)
++            launch { dragOffsetY.animateTo(0f, animationSpec = restore) }
++            animate(dimAlpha.floatValue, 1f, animationSpec = restore) { value, _ -> dimAlpha.floatValue = value }
+         }
+     }
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
+index 880ffe8..92de93d 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
+@@ -4,7 +4,6 @@ package io.github.suqi8.coui.kmp.layout
+ 
+ import androidx.compose.animation.core.Animatable
+ import androidx.compose.animation.core.CubicBezierEasing
+-import androidx.compose.animation.core.animate
+ import androidx.compose.animation.core.tween
+ import androidx.compose.foundation.gestures.detectTapGestures
+ import androidx.compose.foundation.layout.Box
+@@ -33,7 +32,6 @@ import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.MutableIntState
+ import androidx.compose.runtime.getValue
+-import androidx.compose.runtime.mutableFloatStateOf
+ import androidx.compose.runtime.mutableIntStateOf
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
+@@ -178,6 +176,7 @@ internal fun DialogContentLayout(
+ ) {
+     val animationProgress = remember { Animatable(0f, visibilityThreshold = 0.0001f) }
+     val dimProgress = remember { Animatable(0f) }
++    val backProgress = remember { Animatable(0f) }
+     val currentOnDismissFinished by rememberUpdatedState(onDismissFinished)
+     val internalVisible = remember { mutableStateOf(false) }
+ 
+@@ -191,6 +190,7 @@ internal fun DialogContentLayout(
+         // swap the spec or relaunch the effect.
+         val centeredAtStart = isCentered
+         if (show) {
++            backProgress.snapTo(0f)
+             internalVisible.value = true
+             if (enableWindowDim) {
+                 launch { dimProgress.animateTo(1f, tween(EnterDurationMillis, easing = DialogEnterEasing)) }
+@@ -221,9 +221,7 @@ internal fun DialogContentLayout(
+     if (!show && !internalVisible.value) return
+ 
+     val coroutineScope = rememberCoroutineScope()
+-    val dimAlpha = remember { mutableFloatStateOf(1f) }
+     val dialogHeightPx = remember { mutableIntStateOf(0) }
+-    val backProgress = remember { Animatable(0f) }
+     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
+ 
+     val windowInfo = LocalWindowInfo.current
+@@ -232,22 +230,15 @@ internal fun DialogContentLayout(
+         { currentOnDismissRequest?.invoke() }
+     }
+ 
+-    val resetGesture: suspend () -> Unit = remember {
+-        {
+-            backProgress.animateTo(0f, animationSpec = tween(durationMillis = 150))
+-            animate(dimAlpha.floatValue, 1f, animationSpec = tween(durationMillis = 150)) { value, _ ->
+-                dimAlpha.floatValue = value
+-            }
+-        }
+-    }
+-
+     popupHost(internalVisible.value) {
+         val navigationEventState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
+         NavigationBackHandler(
+             state = navigationEventState,
+             isBackEnabled = show,
+             onBackCancelled = {
+-                coroutineScope.launch { resetGesture() }
++                coroutineScope.launch {
++                    backProgress.animateTo(0f, animationSpec = tween(durationMillis = 150))
++                }
+             },
+             onBackCompleted = { requestDismiss() },
+         )
+@@ -261,9 +252,7 @@ internal fun DialogContentLayout(
+                         transitionState is NavigationEventTransitionState.InProgress &&
+                         transitionState.direction == NavigationEventTransitionState.TRANSITIONING_BACK
+                     ) {
+-                        val progress = transitionState.latestEvent.progress
+-                        backProgress.snapTo(progress)
+-                        dimAlpha.floatValue = 1f - progress
++                        backProgress.snapTo(transitionState.latestEvent.progress)
+                     }
+                 }
+         }
+@@ -274,7 +263,7 @@ internal fun DialogContentLayout(
+                 modifier = Modifier
+                     .fillMaxSize()
+                     .drawBehind {
+-                        drawRect(baseColor.copy(alpha = baseColor.alpha * dimAlpha.floatValue * dimProgress.value))
++                        drawRect(baseColor.copy(alpha = baseColor.alpha * (1f - backProgress.value) * dimProgress.value))
+                     },
+             )
+         }

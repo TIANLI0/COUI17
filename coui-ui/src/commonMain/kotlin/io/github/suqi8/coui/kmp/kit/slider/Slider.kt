@@ -123,7 +123,7 @@ internal fun CouiKitSlider(
     val scope = rememberCoroutineScope()
     val onChange by rememberUpdatedState(onValueChange)
     val onFinished by rememberUpdatedState(onValueChangeFinished)
-    val motion = remember(valueRange, steps, density, keyPointFractions, magnetThreshold, hapticCode, moveByFinger, scope) {
+    val motion = remember(valueRange, steps, density, keyPointFractions, magnetThreshold, hapticCode, scope) {
         CouiSliderMotion(
             scope = scope,
             range = valueRange,
@@ -136,7 +136,6 @@ internal fun CouiKitSlider(
             keyPointFractions = keyPointFractions,
             magnetThreshold = magnetThreshold,
             hapticEffect = hapticCode,
-            moveByFinger = moveByFinger,
         ) { code, _ ->
             performSliderHaptic(haptic, code)
         }
@@ -168,7 +167,7 @@ internal fun CouiKitSlider(
     val span = valueRange.endInclusive - valueRange.start
     val keyIncrement = span / if (steps > 0 || showTickMarks) steps + 1 else 100
     val scale = (height / 20.dp).coerceAtLeast(0.1f)
-    val capInset = 14f * density * scale
+    val capInset = SliderDefaults.HorizontalTrackInset.value * density * scale
     var coordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Box(
         modifier
@@ -203,7 +202,7 @@ internal fun CouiKitSlider(
             }
             .focusable(interactive)
             .onSizeChanged { motion.resize((it.width - 2f * capInset).coerceAtLeast(0f)) }
-            .pointerInput(motion, touch, interactive, effectiveReverse, capInset) {
+            .pointerInput(motion, touch, interactive, effectiveReverse, capInset, moveByFinger) {
                 if (!interactive) return@pointerInput
                 awaitEachGesture {
                     val down = awaitFirstDown()
@@ -218,9 +217,12 @@ internal fun CouiKitSlider(
                         val local = x - pointerOffset - touch.translationX.value - capInset
                         return if (effectiveReverse) motion.length - local else local
                     }
+                    val touchStart = fingerX(down.position.x)
+                    val thumbStart = motion.fraction * motion.length
+                    val dragAdjustment = if (moveByFinger) thumbStart - touchStart else 0f
                     try {
                         coordinates?.takeIf { it.isAttached }?.let { tracker.add(down, it, start = true) }
-                        motion.press(fingerX(down.position.x))
+                        motion.press(touchStart + dragAdjustment)
                         touch.begin(down.position, size)
                         while (true) {
                             val event = awaitPointerEvent()
@@ -237,7 +239,7 @@ internal fun CouiKitSlider(
                             }
                             if (tracked.isConsumed) break
                             if (!tracked.pressed) {
-                                val local = fingerX(tracked.position.x)
+                                val local = fingerX(tracked.position.x) + if (dragging) dragAdjustment else 0f
                                 val inside = tracked.position.x in 0f..size.width.toFloat() &&
                                     tracked.position.y in 0f..size.height.toFloat()
                                 val xVelocityPxPerSec = (tracker.releaseVelocity().x / RELEASE_VELOCITY_SCALE)
@@ -263,7 +265,7 @@ internal fun CouiKitSlider(
                             if (dragging || abs(delta.x) > viewConfiguration.touchSlop) {
                                 dragging = true
                                 motion.drag(
-                                    fingerX(tracked.position.x),
+                                    fingerX(tracked.position.x) + dragAdjustment,
                                     xVelocityPxPerSec * if (effectiveReverse) -1f else 1f,
                                 )
                                 tracked.consume()

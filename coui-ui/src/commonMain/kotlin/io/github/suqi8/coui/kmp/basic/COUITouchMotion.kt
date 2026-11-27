@@ -357,17 +357,17 @@ fun Modifier.couiTouchMotion(
         val releaseSpec = if (usesCandySpring) spec.candyReleaseSpring else spec.releaseSpring
         pressProgress.animateTo(if (pressed) 1f else 0f, if (pressed) pressSpec else releaseSpec)
     }
-    // A popup remains mounted during exit. Cancelling its pointer coroutine must also clear the
-    // contributions whose release jobs belonged to that coroutine, before a possible re-entry.
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            pressed = false
-            translateXAnim.snapTo(0f)
-            translateYAnim.snapTo(0f)
-            scaleXAnim.snapTo(1f)
-            scaleYAnim.snapTo(1f)
-            lightProgress.snapTo(0f)
-        }
+    // These keys also restart the pointer coroutine. Clear the old gesture's contributions
+    // before the new configuration accepts input.
+    LaunchedEffect(enabled, spec, density.density, consumeDrag) {
+        pressed = false
+        extinguishing = false
+        pressProgress.snapTo(0f)
+        translateXAnim.snapTo(0f)
+        translateYAnim.snapTo(0f)
+        scaleXAnim.snapTo(1f)
+        scaleYAnim.snapTo(1f)
+        lightProgress.snapTo(0f)
     }
     ownerState.values = remember(translateXAnim, translateYAnim, scaleXAnim, scaleYAnim, pressTarget) {
         derivedStateOf {
@@ -470,7 +470,9 @@ fun Modifier.couiTouchMotion(
                                 last = position
                                 updateLight(position)
                                 if (!dragging && (abs(dx) >= deadZonePx || abs(dy) >= deadZonePx)) dragging = true
-                                if (dragging && (abs(dx) >= deadZonePx || abs(dy) >= deadZonePx)) {
+                                if (dragging) {
+                                    // The dead zone only starts the drag. Track the way back to
+                                    // the origin too, so the surface can center under the finger.
                                     if (consumeDrag) change.consume()
                                     val deform = couiDeformationScales(dx + deformRest.x, dy + deformRest.y, spec, widthPx.value, heightPx.value, density.density)
                                     motionJob?.cancel()

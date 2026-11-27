@@ -226,12 +226,6 @@ private class PopupShift {
 /**
  * Internal shared layout for cascading list popups. Cascading depth is limited to 2.
  *
- * ColorOS system apps — the Gallery among them — lay their popups out with the panel's *physical*
- * density, so a display-size override only changes third-party apps. Rendering this popup at the
- * app density would make every row, font and padding about 10% larger than the popup it mimics on a
- * phone whose density was raised above the panel's. [popupPhysicalDensity] restores the native
- * geometry; on a device without an override it is the identity.
- *
  * [popupHost] receives the mounted state, a `passTouches` probe and the content. `passTouches` turns
  * true the moment the close starts: the panel keeps shrinking into its anchor, but a host that blocks
  * touches outside the panel has to stop doing so right away, so the page beneath can already be
@@ -239,60 +233,6 @@ private class PopupShift {
  */
 @Composable
 internal fun CascadingListPopupLayout(
-    show: Boolean,
-    popupHost: @Composable (visible: Boolean, passTouches: () -> Boolean, content: @Composable () -> Unit) -> Unit,
-    entries: List<DropdownEntry>,
-    onDismissRequest: () -> Unit,
-    dropdownColors: DropdownColors,
-    popupModifier: Modifier = Modifier,
-    onDismissFinished: (() -> Unit)? = null,
-    popupPositionProvider: PopupPositionProvider = ListPopupDefaults.DropdownPositionProvider,
-    alignment: PopupPositionProvider.Align = PopupPositionProvider.Align.End,
-    enableWindowDim: Boolean = false,
-    maxHeight: Dp? = null,
-    minWidth: Dp = ListPopupDefaults.MinWidth,
-    collapseOnSelection: Boolean = true,
-    enableGlass: Boolean = false,
-) {
-    val density = LocalDensity.current
-    val popupDensity = remember(density) { popupPhysicalDensity(density) }
-    CompositionLocalProvider(LocalDensity provides popupDensity) {
-        CascadingListPopupLayoutImpl(
-            show = show,
-            popupHost = popupHost,
-            entries = entries,
-            onDismissRequest = onDismissRequest,
-            dropdownColors = dropdownColors,
-            popupModifier = popupModifier,
-            onDismissFinished = onDismissFinished,
-            popupPositionProvider = popupPositionProvider,
-            alignment = alignment,
-            enableWindowDim = enableWindowDim,
-            maxHeight = maxHeight,
-            minWidth = minWidth,
-            collapseOnSelection = collapseOnSelection,
-            enableGlass = enableGlass,
-        )
-    }
-}
-
-/**
- * `ro.sf.lcd_density` — the panel's density, which ColorOS system apps use for their popups while
- * third-party apps follow the display-size override. Falls back to [base] when the property is
- * missing or implausible.
- */
-internal fun popupPhysicalDensity(base: Density): Density {
-    val physicalDpi = platformPhysicalDensityDpi() ?: return base
-    val currentDpi = (base.density * 160f).roundToInt()
-    if (physicalDpi <= 0 || currentDpi <= 0 || physicalDpi == currentDpi) return base
-    val ratio = physicalDpi.toFloat() / currentDpi
-    // A broken property must not make the menu unusable.
-    if (ratio < 0.75f || ratio > 1.25f) return base
-    return Density(base.density * ratio, base.fontScale)
-}
-
-@Composable
-private fun CascadingListPopupLayoutImpl(
     show: Boolean,
     popupHost: @Composable (visible: Boolean, passTouches: () -> Boolean, content: @Composable () -> Unit) -> Unit,
     entries: List<DropdownEntry>,

@@ -57,6 +57,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
@@ -464,9 +465,15 @@ fun IntentSlider(
                 progressBarRangeInfo = ProgressBarRangeInfo(coercedValue, valueRange.start..valueRange.endInclusive, 0)
                 if (enabled) {
                     setProgress { target ->
-                        onValueChangeState(target.coerceIn(valueRange.start, valueRange.endInclusive))
+                        if (!target.isFinite()) return@setProgress false
+                        val resolved = target.coerceIn(valueRange.start, valueRange.endInclusive)
+                        if (resolved == coercedValue) return@setProgress false
+                        onValueChangeState(resolved)
+                        onValueChangeFinishedState?.invoke()
                         true
                     }
+                } else {
+                    disabled()
                 }
             },
         contentAlignment = Alignment.Center,
