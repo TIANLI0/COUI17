@@ -3,7 +3,6 @@
     <string name="coui17_action_back">Back</string>
     <string name="coui17_action_cancel">Cancel</string>
     <string name="coui17_action_close">Close</string>
-    <string name="coui17_action_clear">Clear</string>
     <string name="coui17_state_expanded">expanded</string>
     <string name="coui17_state_collapsed">collapsed</string>
 </resources>
