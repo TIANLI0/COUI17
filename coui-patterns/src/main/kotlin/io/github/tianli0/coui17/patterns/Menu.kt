@@ -23,18 +23,29 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntSize
 import io.github.suqi8.coui.kmp.basic.DropdownImpl
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.size
+import io.github.suqi8.coui.kmp.theme.COUITheme
+import io.github.suqi8.coui.kmp.basic.Icon
+import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.ListPopupColumn
 import io.github.suqi8.coui.kmp.basic.PreciseClickState
 import io.github.suqi8.coui.kmp.blur.isBlurEnabled
 import io.github.suqi8.coui.kmp.window.WindowListPopup
 
-/** One row of a [GlassMenu]. [selected] shows the check mark; [danger] paints the label red. */
+/**
+ * One row of a [GlassMenu]. [selected] shows the check mark; [danger] paints the label red.
+ * [trailingIcon] sits at the row's end before the check (COUI's hint slot), e.g. the ↑ / ↓ that
+ * ColorOS Files puts on the active sort key instead of a check.
+ */
 data class MenuEntry(
     val text: String,
     val selected: Boolean = false,
     val danger: Boolean = false,
     val enabled: Boolean = true,
+    val trailingIcon: ImageVector? = null,
     val onClick: () -> Unit,
 )
 
@@ -61,7 +72,24 @@ fun GlassMenu(show: Boolean, entries: List<MenuEntry>, onDismiss: () -> Unit, to
     ) {
         ListPopupColumn {
             entries.forEachIndexed { index, entry ->
-                val item = remember(entry.text, entry.enabled, entry.danger) { DropdownItem(text = entry.text, enabled = entry.enabled, alert = entry.danger) }
+                val trailing = entry.trailingIcon
+                val item = remember(entry.text, entry.enabled, entry.danger, trailing) {
+                    DropdownItem(
+                        text = entry.text,
+                        enabled = entry.enabled,
+                        alert = entry.danger,
+                        hint = trailing?.let { icon ->
+                            {
+                                Icon(
+                                    icon,
+                                    contentDescription = null,
+                                    tint = COUITheme.colorScheme.onSurfaceContainer,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
+                        },
+                    )
+                }
                 DropdownImpl(
                     item = item,
                     optionSize = entries.size,
