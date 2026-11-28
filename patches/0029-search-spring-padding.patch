@@ -1,0 +1,14 @@
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
+index cd10ad2..c881fa9 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
+@@ -150,7 +150,8 @@ fun SearchBar(
+                     .weight(1f)
+                     .padding(
+                         start = insideMargin.width,
+-                        end = fieldEndPadding,
++                        // The edit-state spring may overshoot when its target is zero.
++                        end = fieldEndPadding.coerceAtLeast(0.dp),
+                         top = insideMargin.height,
+                         bottom = insideMargin.height,
+                     ),

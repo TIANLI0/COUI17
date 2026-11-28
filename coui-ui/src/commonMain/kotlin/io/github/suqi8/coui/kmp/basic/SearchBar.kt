@@ -150,7 +150,8 @@ fun SearchBar(
                     .weight(1f)
                     .padding(
                         start = insideMargin.width,
-                        end = fieldEndPadding,
+                        // The edit-state spring may overshoot when its target is zero.
+                        end = fieldEndPadding.coerceAtLeast(0.dp),
                         top = insideMargin.height,
                         bottom = insideMargin.height,
                     ),
