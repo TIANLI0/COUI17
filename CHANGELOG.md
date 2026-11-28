@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Aligned with a ColorOS 17.0.1 phone (patch 0026; see UPSTREAM.md): confirmations sit at the
+  bottom edge on phones (`AlertDialogStyle.Bottom`, `ConfirmDialog(destructive = …)` for a red
+  delete label), dialog buttons take the frosted fill, `FormDialog` fields are underlined and the
+  first one opens the keyboard, popup menus sit 12dp from the anchor with neutral selection, sheet
+  drag / dismiss / pull-up physics and toolbar geometry match `COUIBottomSheetBehavior`, the large
+  title follows the list instead of snapping, and search, button, slider and snackbar parameters
+  follow the system values.
+- `pageFlingBehavior()`: the friction-only ColorOS list fling (1.6/s above 10,000 px/s, 2.5/s
+  below), for a page's main list.
 - Local changes to upstream sources are recorded as patches 0005–0008, and
   `tools/check_patches.py` (run in CI and before each sync) fails when the upstream-owned sources
   differ from `UPSTREAM_SHA` plus `patches/`. Before this, the next sync would have reverted

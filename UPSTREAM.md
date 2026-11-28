@@ -248,6 +248,25 @@ never clips mid-gap, expose explicit bottom panel padding without IME coupling, 
 to `BasicComponent` on its hold-down interaction source, and wait briefly for the first
 `HostWindowBackdrop` capture before revealing `WindowBottomSheet` and `WindowListPopup`.
 
+### 0026 — ColorOS 17 device alignment
+
+Measured against a ColorOS 17.0.1 phone (screen recordings of Files, Clock and Settings, fitted
+frame by frame) and Files 17.10.4 / Wallpapers & style 17.0.21 decompiled. Popup menus sit 12dp
+from their anchor, summaries are 12sp and the selected row is neutral, not accent. Sheets: the scrim
+follows `1 − offset / parentHeight` while dragged and fades the rest out on dismiss, the dismiss
+rule has no velocity projection, a hidden-state settle uses `0.18 + 0.19 × remaining share`, a
+pull-up returns on Rebound(6, 42), the toolbar is 52dp with a 2-line, weight-550 title and a 16dp
+handle strip. Dialogs: title weight 550, `AlertDialogStyle.Bottom` (bottom edge below sw480,
+centred above) and a `dangerButton` for red destructive labels; an alert dialog resolves its
+button colours inside the dialog window, where the host backdrop exists, so the frosted capsule
+fill is used instead of the flat fallback. `COUIScrollBehavior` follows the list's displacement
+with the 0.2 / 0.1 springs instead of snapping. Search: the fallback edit transition uses the
+bounce 0.25 / response 0.5 springs with the 0.5 cancel scale; icon expand starts the cancel button
+at 0.6 and fades it linearly; icon collapse response 0.5. Large buttons are at least 132dp, button
+tint and scale use the `PressParams` springs, the slider uses the 0.3 / 0.15 springs, the
+snackbar keeps 88 / 64 / 32dp from the bottom by window height, the preference arrow keeps 4dp
+from its status text, and `Pressable` waits 100ms before showing a press.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on

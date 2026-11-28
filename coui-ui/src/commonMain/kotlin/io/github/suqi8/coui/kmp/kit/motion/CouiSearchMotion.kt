@@ -57,7 +57,8 @@ internal class CouiSearchMotion(
         // Only update target while running so velocity is preserved without cancelling.
         searchSpring.animateTo(
             target = target,
-            response = if (value) 0.55f else 0.45f,
+            // IconExpandToEditParamsHigh 0.55 / IconCollapseToNormalParamsHigh 0.5 (bounce 0.2).
+            response = if (value) 0.55f else 0.5f,
             bounce = 0.2f,
             minimumChange = 0.001f,
             onFrame = { next -> progress = next / 1000f },

@@ -4,13 +4,13 @@ package io.github.suqi8.coui.kmp.basic
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -135,7 +135,7 @@ fun SearchBar(
     val actionEndPadding = COUIResponsiveUtils.pick(windowClass, 4.dp, 12.dp, 28.dp)
     val fieldEndPadding by animateDpAsState(
         targetValue = if (expanded && outsideEndAction != null) 0.dp else insideMargin.width,
-        animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase),
+        animationSpec = spring(dampingRatio = EditStateDamping, stiffness = EditStateStiffness),
         label = "search field end padding",
     )
     Column(
@@ -157,25 +157,30 @@ fun SearchBar(
             ) {
                 inputField()
             }
-            // COUISearchBar edit-state transition: background resize, button slide and fade,
-            // all with COUIMoveEaseInterpolator. Bound to a local so the non-null branch
-            // stays smart-cast inside the trailing lambdas below.
+            // COUISearchBar edit-state transition. ColorOS drives the capsule width, the cancel
+            // button and its fade with springs whatever the blur state (StateChangedToEditParamsHigh /
+            // ToNormal: bounce 0.25, response 0.5); the 450ms DEFAULT_SEARCH_VIEW_OFFSET_CHANGE_DURATION
+            // constant is declared but unused. The cancel button scales from 0.5 and slides 60dp
+            // (coui_search_bar_functional_button_offset_distance). Bound to a local so the non-null
+            // branch stays smart-cast inside the trailing lambdas below.
             val endAction = outsideEndAction
             if (endAction != null) {
                 AnimatedVisibility(
                     visible = expanded,
-                    enter = expandHorizontally(animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase)) +
+                    enter = expandHorizontally(animationSpec = spring(EditStateDamping, EditStateStiffness)) +
                         slideInHorizontally(
-                            animationSpec = tween(ActionOffsetDurationMillis, easing = MoveEase),
+                            animationSpec = spring(EditStateDamping, EditStateStiffness),
                             initialOffsetX = { actionSlideDistancePx },
                         ) +
-                        fadeIn(animationSpec = tween(ActionAlphaDurationMillis, easing = MoveEase)),
-                    exit = shrinkHorizontally(animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase)) +
+                        scaleIn(animationSpec = spring(EditStateDamping, EditStateStiffness), initialScale = 0.5f) +
+                        fadeIn(animationSpec = spring(dampingRatio = 1f, stiffness = EditStateStiffness)),
+                    exit = shrinkHorizontally(animationSpec = spring(EditStateDamping, EditStateStiffness)) +
                         slideOutHorizontally(
-                            animationSpec = tween(ActionOffsetDurationMillis, easing = MoveEase),
+                            animationSpec = spring(EditStateDamping, EditStateStiffness),
                             targetOffsetX = { actionSlideDistancePx },
                         ) +
-                        fadeOut(animationSpec = tween(ActionAlphaDurationMillis, easing = MoveEase)),
+                        scaleOut(animationSpec = spring(EditStateDamping, EditStateStiffness), targetScale = 0.5f) +
+                        fadeOut(animationSpec = spring(dampingRatio = 1f, stiffness = EditStateStiffness)),
                 ) {
                     Box(
                         modifier = Modifier.padding(
@@ -1235,10 +1240,11 @@ private fun materialBarColor(): Color = if (COUITheme.colorScheme.background.lum
     Color(0x99FFFFFF)
 }
 
-private val MoveEase = CubicBezierEasing(0.3f, 0f, 0.1f, 1f)
-private val BackgroundResizeDurationMillis = 450
-private val ActionOffsetDurationMillis = 400
-private val ActionAlphaDurationMillis = 350
+/** StateChangedToEditParamsHigh / ToNormal: bounce 0.25 → damping ratio 0.75. */
+private const val EditStateDamping = 0.75f
+
+/** The same spring's response 0.5 → stiffness (2π / 0.5)². */
+private const val EditStateStiffness = 157.91f
 private val ActionSlideDistance = 60.dp
 
 @Composable

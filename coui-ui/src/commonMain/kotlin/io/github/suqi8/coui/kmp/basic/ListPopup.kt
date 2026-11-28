@@ -1318,11 +1318,13 @@ object ListPopupDefaults {
      * `PopupMenuLocateHelper.setAnchor`: it collapses `mAnchorBounds` to `(left + x, top + y)` and
      * pairs it with the context rule's EMPTY_OUTSETS instead of DEFAULT_ANCHOR_OUTSETS.
      *
-     * @param verticalMargin The extra vertical margin between the popup and the anchor.
+     * @param verticalMargin The extra vertical margin between the popup and the anchor. 12dp is
+     *   COUI 17's `coui_popup_list_window_default_vertical_gap_to_anchor` (Files 17.10.4, also measured
+     *   on a ColorOS 17.0.1 phone: 48px at 640dpi); older support libraries used 8dp.
      * @param horizontalMargin The extra horizontal margin applied to the popup.
      */
     fun dropdownPositionProvider(
-        verticalMargin: Dp = 8.dp,
+        verticalMargin: Dp = 12.dp,
         horizontalMargin: Dp = HorizontalBarrier,
     ): PopupPositionProvider = object : PopupPositionProvider {
         private val margins = PaddingValues(horizontal = horizontalMargin, vertical = verticalMargin)
@@ -1343,7 +1345,7 @@ object ListPopupDefaults {
             val available = availableRight - availableLeft
 
             // A zero-area anchor is a recorded touch point; COUI then uses EMPTY_OUTSETS, so the
-            // 8dp gap collapses and the below/above test runs against the point itself.
+            // anchor gap collapses and the below/above test runs against the point itself.
             val isPointAnchored = anchorBounds.width == 0 && anchorBounds.height == 0
             val verticalGap = if (isPointAnchored) 0 else popupMargin.bottom
             val topGap = if (isPointAnchored) 0 else popupMargin.top

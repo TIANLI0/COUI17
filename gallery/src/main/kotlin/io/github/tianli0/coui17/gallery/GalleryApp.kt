@@ -57,6 +57,7 @@ import io.github.tianli0.coui17.patterns.ThemeMode
 import io.github.tianli0.coui17.patterns.pageContainerColor
 import io.github.tianli0.coui17.patterns.pageListPadding
 import io.github.tianli0.coui17.patterns.pageScroll
+import io.github.tianli0.coui17.patterns.pageFlingBehavior
 import io.github.tianli0.coui17.patterns.rememberPageListState
 
 /** The gallery's two languages: 简体中文 when the app locale is Chinese, English otherwise. */
@@ -179,6 +180,7 @@ fun PageList(content: LazyListScope.() -> Unit) {
         state = rememberPageListState(),
         modifier = Modifier.fillMaxWidth().pageScroll(),
         contentPadding = pageListPadding(),
+        flingBehavior = pageFlingBehavior(),
         content = content,
     )
 }

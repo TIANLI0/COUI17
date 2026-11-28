@@ -8,10 +8,13 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.AnimationState
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.DecayAnimationSpec
-import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.animateTo
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.SpringSpec
+import androidx.compose.animation.core.spring
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
@@ -796,15 +799,17 @@ fun SmallTopAppBar(
  *   list instead of waiting for the list to reach its top. `true` is the continuous Material3
  *   behavior: the bar expands by the drag distance wherever the list is, which also keeps the
  *   material alpha — driven by the content displacement — from dipping while the bar grows.
- *   `false` (default) pins the title to the toolbar row while the content is scrolled and snaps it
- *   back into the large-title row only at the top, matching the ColorOS notes/settings headers.
+ *   `false` (default) collapses the header as the list is pushed up, following the list's own
+ *   displacement with COUICollapsableAppBarLayout's springs (0.2 up / 0.1 down), and only grows it
+ *   back near the top of the list, as the ColorOS 17 Settings header does. A [snapAnimationSpec]
+ *   other than the default switches to the two-state snap.
  */
 @Suppress("ComposableNaming")
 @Composable
 fun COUIScrollBehavior(
     state: TopAppBarState = rememberTopAppBarState(),
     canScroll: () -> Boolean = { true },
-    snapAnimationSpec: AnimationSpec<Float>? = tween(durationMillis = SnapAnimationDuration, easing = SnapAnimationEasing),
+    snapAnimationSpec: AnimationSpec<Float>? = FollowListAttachSpring,
     flingAnimationSpec: DecayAnimationSpec<Float>? = rememberSplineBasedDecay(),
     expandOnContentScroll: Boolean = false,
 ): ScrollBehavior = remember(state, canScroll, snapAnimationSpec, flingAnimationSpec, expandOnContentScroll) {
@@ -1461,14 +1466,40 @@ private fun TopAppBarLayout(
     val snapFraction = remember(scrollBehavior, snapsToTop) {
         Animatable(if (snapsToTop && collapsedTarget) 1f else 0f)
     }
-    LaunchedEffect(scrollBehavior, snapsToTop, collapsedTarget) {
+    // COUICollapsableAppBarLayout.ScrollBehavior: the header follows the list with a spring
+    // (followListResponseUp 0.2 while the list is pushed up, followListResponseDown 0.1 while it
+    // is pulled down, bounce 0) rather than jumping between the two states. The bar never consumes
+    // the scroll here, so the list keeps moving 1:1 under the finger and the collapse fraction is
+    // the list's own displacement over the collapse distance. Exit-until-collapsed still holds: the
+    // displacement is only small again near the top of the list. A custom snapAnimationSpec, or
+    // forceCollapsed, keeps the old two-state transition.
+    LaunchedEffect(scrollBehavior, snapsToTop, forceCollapsed) {
         if (!snapsToTop) {
             snapFraction.snapTo(0f)
-        } else {
+            return@LaunchedEffect
+        }
+        val customSpec = scrollBehavior.snapAnimationSpec?.takeIf { it != FollowListAttachSpring }
+        if (customSpec != null || forceCollapsed) {
+            snapshotFlow { collapsedTarget }.collectLatest { collapsed ->
+                snapFraction.animateTo(
+                    targetValue = if (collapsed) 1f else 0f,
+                    animationSpec = customSpec ?: FollowListAttachSpring,
+                )
+            }
+            return@LaunchedEffect
+        }
+        snapshotFlow {
+            val state = scrollBehavior.state
+            val distance = (-state.heightOffsetLimit).takeIf { it > 0f }
+            if (distance == null) {
+                if (state.contentOffset < -1f) 1f else 0f
+            } else {
+                (-state.contentOffset / distance).coerceIn(0f, 1f)
+            }
+        }.collectLatest { target ->
             snapFraction.animateTo(
-                targetValue = if (collapsedTarget) 1f else 0f,
-                animationSpec = scrollBehavior.snapAnimationSpec
-                    ?: tween(durationMillis = SnapAnimationDuration, easing = SnapAnimationEasing),
+                targetValue = target,
+                animationSpec = if (target >= snapFraction.value) FollowListUpSpring else FollowListDownSpring,
             )
         }
     }
@@ -2415,14 +2446,17 @@ private val FadedLargeTitleScale = 0.7f
  */
 private val CollapsingTitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
 
-/**
- * The duration of the snap animation that settles the bar after a drag or fling
- * (AppBarLayout.BaseBehavior.animateOffsetTo for the app bar's snap distance).
- */
-private val SnapAnimationDuration = 180
+/** `followListResponseUp` 0.2, bounce 0: the header following a list pushed up. */
+private val FollowListUpSpring = spring<Float>(dampingRatio = 1f, stiffness = 986.96f)
 
-/** The DecelerateInterpolator that AppBarLayout.BaseBehavior installs on its offset animator. */
-private val SnapAnimationEasing = Easing { fraction -> 1f - (1f - fraction) * (1f - fraction) }
+/** `followListResponseDown` 0.1, bounce 0: the header following a list pulled down. */
+private val FollowListDownSpring = spring<Float>(dampingRatio = 1f, stiffness = 3947.84f)
+
+/**
+ * `attachResponse` 0.25, bounce 0: COUICollapsableAppBarLayout.animateOffsetWithDuration ignores
+ * the duration and settles with this spring.
+ */
+internal val FollowListAttachSpring: SpringSpec<Float> = spring(dampingRatio = 1f, stiffness = 631.65f)
 
 /**
  * The collapsed fraction at which the morphing large title is swapped for the dedicated

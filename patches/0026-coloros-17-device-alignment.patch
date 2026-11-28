@@ -1,0 +1,849 @@
+diff --git a/coui-preference/src/commonMain/kotlin/io/github/suqi8/coui/kmp/preference/ArrowPreference.kt b/coui-preference/src/commonMain/kotlin/io/github/suqi8/coui/kmp/preference/ArrowPreference.kt
+index 7596ef6..d32e503 100644
+--- a/coui-preference/src/commonMain/kotlin/io/github/suqi8/coui/kmp/preference/ArrowPreference.kt
++++ b/coui-preference/src/commonMain/kotlin/io/github/suqi8/coui/kmp/preference/ArrowPreference.kt
+@@ -254,6 +254,9 @@ private fun RowScope.ArrowPreferenceEndAction(
+     }
+     Image(
+         modifier = Modifier
++            // coui_preference_widget_jump.xml: the arrow keeps support_preference_image_margin_start
++            // (4dp) from the status text / red dot before it.
++            .padding(start = 4.dp)
+             // RTL mirroring is handled by the icon itself (autoMirror).
+             .size(width = 12.dp, height = 24.dp)
+             .align(Alignment.CenterVertically),
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt
+index cd25956..da778c5 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Button.kt
+@@ -155,21 +155,21 @@ fun Button(
+     val tintProgress = remember { Animatable(0f) }
+     LaunchedEffect(enabled, isPressed) {
+         if (enabled && isPressed) {
+-            tintProgress.animateTo(1f, PressDownSpring)
++            tintProgress.animateTo(1f, PressTintSpring)
+         } else if (!enabled) {
+             tintProgress.snapTo(0f)
+         } else if (tintProgress.value > 0f) {
+             if (tintProgress.value < PressedTintMinVisibleProgress) {
+                 // Keep the press-in animation running until the tint is clearly visible.
+                 try {
+-                    tintProgress.animateTo(1f, PressDownSpring) {
++                    tintProgress.animateTo(1f, PressTintSpring) {
+                         if (value >= PressedTintMinVisibleProgress) throw PressTintThresholdReached()
+                     }
+                 } catch (_: PressTintThresholdReached) {
+                     // Minimum visible progress reached; fall through to the fade-out.
+                 }
+             }
+-            tintProgress.animateTo(0f, PressReleaseSpring)
++            tintProgress.animateTo(0f, PressTintSpring)
+         }
+     }
+     val pressTint = if (isDark) PressedTintDark else PressedTintLight
+@@ -677,10 +677,11 @@ object ButtonDefaults {
+     val PressedBrightness = 0.8f
+ 
+     /**
+-     * The default min width applied for all buttons. Note that you can override it by applying
+-     * Modifier.widthIn directly on the button composable.
++     * The default min width of a regular (Large) button, `coui_btn_large_width_min` = 132dp
++     * (`Widget.COUI.Button.Large`). Override it through the `minWidth` parameter or
++     * Modifier.widthIn.
+      */
+-    val MinWidth = 58.dp
++    val MinWidth = 132.dp
+ 
+     /**
+      * The default min height applied for all buttons. Note that you can override it by applying
+@@ -966,16 +967,21 @@ data class TextButtonColors(
+ )
+ 
+ /**
+- * The COUI press spring (COUIPressAnimatorUnit → PressEngineConfig responsePress 0.13 / bouncePress
+- * 0.18, so dampingRatio = 1 - bounce and stiffness = (2π / response)²).
++ * The COUI press-scale spring: `PressParams.jellyPress` (bounce 0, response 0.25), which
++ * `COUIPressAnimatorUnit` installs over `PressEngineConfig`'s 0.13 / 0.18 defaults; dampingRatio =
++ * 1 - bounce, stiffness = (2π / response)².
+  */
+-private val PressDownSpring = spring<Float>(dampingRatio = 0.82f, stiffness = 2336f)
++private val PressDownSpring = spring<Float>(dampingRatio = 1f, stiffness = 631.65f)
++
++/** The hand-up scale spring, `PressParams.jellyHandup` (bounce 0.6, response 0.5). */
++private val PressReleaseSpring = spring<Float>(dampingRatio = 0.4f, stiffness = 157.91f)
+ 
+ /**
+- * The COUI release spring (PressEngineConfig responseRelease 0.35 / bounceRelease 0.62). The press
+- * engine uses a separate, much bouncier curve for the hand-up.
++ * The press tint spring: `COUIButton` draws its pressed colour through `COUIMaskEffectDrawable`,
++ * whose press layer runs response 0.3 / bounce 0 both ways (same as list rows), so the tint never
++ * overshoots below zero on release.
+  */
+-private val PressReleaseSpring = spring<Float>(dampingRatio = 0.38f, stiffness = 322.3f)
++private val PressTintSpring = spring<Float>(dampingRatio = 1f, stiffness = 438.65f)
+ 
+ /** couiColorPress in light themes (coui_color_press #1F000000). */
+ private val PressedTintLight = Color(0x1F000000)
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Dropdown.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Dropdown.kt
+index 7cfbf6f..75c36d2 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Dropdown.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Dropdown.kt
+@@ -223,7 +223,9 @@ fun DropdownImpl(
+                 item.summary?.let {
+                     Text(
+                         text = it,
+-                        style = COUITheme.textStyles.body2,
++                        // Popup rows: couiTextBodyXS (12sp, COUI DefaultAdapter.setDescription); dialog
++                        // rows keep body2.
++                        style = if (dialogMode) COUITheme.textStyles.body2 else COUITheme.textStyles.footnote2,
+                         color = summaryColor,
+                         // COUI DefaultAdapter.setDescription.
+                         maxLines = DropdownDefaults.SummaryMaxLines,
+@@ -767,8 +769,10 @@ object DropdownDefaults {
+     val HeaderMaxLines: Int = 2
+ 
+     /**
+-     * Default popup row colors, matching COUI coui_popup_list_window_item_tint_selector
+-     * (default couiColorLabelPrimary, selected couiColorLabelTheme, disabled couiColorLabelTertiary).
++     * Default popup row colors, matching COUI 17 coui_popup_list_window_item_tint_selector
++     * (default and selected couiColorLabelPrimary, disabled couiColorLabelTertiary): the selected row
++     * is marked by the neutral check alone, not by an accent colour (Files 17.10.4, and the ColorOS
++     * 17.0.1 Files sort menu on device).
+      * Summaries always use couiColorLabelSecondary, and row containers stay transparent —
+      * the popup surface provides the fill.
+      */
+@@ -777,10 +781,10 @@ object DropdownDefaults {
+         contentColor: Color = COUITheme.colorScheme.onSurfaceContainer,
+         summaryColor: Color = COUITheme.colorScheme.onSurfaceSecondary,
+         containerColor: Color = Color.Transparent,
+-        selectedContentColor: Color = COUITheme.colorScheme.primary,
++        selectedContentColor: Color = COUITheme.colorScheme.onSurfaceContainer,
+         selectedSummaryColor: Color = COUITheme.colorScheme.onSurfaceSecondary,
+         selectedContainerColor: Color = Color.Transparent,
+-        selectedIndicatorColor: Color = COUITheme.colorScheme.primary,
++        selectedIndicatorColor: Color = COUITheme.colorScheme.onSurfaceContainer,
+         disabledContentColor: Color = COUITheme.colorScheme.disabledOnSecondaryVariant,
+         alertContentColor: Color = COUITheme.colorScheme.error,
+         headerColor: Color = COUITheme.colorScheme.onSurfaceSecondary,
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt
+index a4d1a14..d1324be 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/ListPopup.kt
+@@ -1318,11 +1318,13 @@ object ListPopupDefaults {
+      * `PopupMenuLocateHelper.setAnchor`: it collapses `mAnchorBounds` to `(left + x, top + y)` and
+      * pairs it with the context rule's EMPTY_OUTSETS instead of DEFAULT_ANCHOR_OUTSETS.
+      *
+-     * @param verticalMargin The extra vertical margin between the popup and the anchor.
++     * @param verticalMargin The extra vertical margin between the popup and the anchor. 12dp is
++     *   COUI 17's `coui_popup_list_window_default_vertical_gap_to_anchor` (Files 17.10.4, also measured
++     *   on a ColorOS 17.0.1 phone: 48px at 640dpi); older support libraries used 8dp.
+      * @param horizontalMargin The extra horizontal margin applied to the popup.
+      */
+     fun dropdownPositionProvider(
+-        verticalMargin: Dp = 8.dp,
++        verticalMargin: Dp = 12.dp,
+         horizontalMargin: Dp = HorizontalBarrier,
+     ): PopupPositionProvider = object : PopupPositionProvider {
+         private val margins = PaddingValues(horizontal = horizontalMargin, vertical = verticalMargin)
+@@ -1343,7 +1345,7 @@ object ListPopupDefaults {
+             val available = availableRight - availableLeft
+ 
+             // A zero-area anchor is a recorded touch point; COUI then uses EMPTY_OUTSETS, so the
+-            // 8dp gap collapses and the below/above test runs against the point itself.
++            // anchor gap collapses and the below/above test runs against the point itself.
+             val isPointAnchored = anchorBounds.width == 0 && anchorBounds.height == 0
+             val verticalGap = if (isPointAnchored) 0 else popupMargin.bottom
+             val topGap = if (isPointAnchored) 0 else popupMargin.top
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
+index 1912f64..cd10ad2 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/SearchBar.kt
+@@ -4,13 +4,13 @@ package io.github.suqi8.coui.kmp.basic
+ 
+ import androidx.compose.animation.AnimatedVisibility
+ import androidx.compose.animation.core.Animatable
+-import androidx.compose.animation.core.CubicBezierEasing
+ import androidx.compose.animation.core.animateDpAsState
+ import androidx.compose.animation.core.spring
+-import androidx.compose.animation.core.tween
+ import androidx.compose.animation.expandHorizontally
+ import androidx.compose.animation.fadeIn
+ import androidx.compose.animation.fadeOut
++import androidx.compose.animation.scaleIn
++import androidx.compose.animation.scaleOut
+ import androidx.compose.animation.shrinkHorizontally
+ import androidx.compose.animation.slideInHorizontally
+ import androidx.compose.animation.slideOutHorizontally
+@@ -135,7 +135,7 @@ fun SearchBar(
+     val actionEndPadding = COUIResponsiveUtils.pick(windowClass, 4.dp, 12.dp, 28.dp)
+     val fieldEndPadding by animateDpAsState(
+         targetValue = if (expanded && outsideEndAction != null) 0.dp else insideMargin.width,
+-        animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase),
++        animationSpec = spring(dampingRatio = EditStateDamping, stiffness = EditStateStiffness),
+         label = "search field end padding",
+     )
+     Column(
+@@ -157,25 +157,30 @@ fun SearchBar(
+             ) {
+                 inputField()
+             }
+-            // COUISearchBar edit-state transition: background resize, button slide and fade,
+-            // all with COUIMoveEaseInterpolator. Bound to a local so the non-null branch
+-            // stays smart-cast inside the trailing lambdas below.
++            // COUISearchBar edit-state transition. ColorOS drives the capsule width, the cancel
++            // button and its fade with springs whatever the blur state (StateChangedToEditParamsHigh /
++            // ToNormal: bounce 0.25, response 0.5); the 450ms DEFAULT_SEARCH_VIEW_OFFSET_CHANGE_DURATION
++            // constant is declared but unused. The cancel button scales from 0.5 and slides 60dp
++            // (coui_search_bar_functional_button_offset_distance). Bound to a local so the non-null
++            // branch stays smart-cast inside the trailing lambdas below.
+             val endAction = outsideEndAction
+             if (endAction != null) {
+                 AnimatedVisibility(
+                     visible = expanded,
+-                    enter = expandHorizontally(animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase)) +
++                    enter = expandHorizontally(animationSpec = spring(EditStateDamping, EditStateStiffness)) +
+                         slideInHorizontally(
+-                            animationSpec = tween(ActionOffsetDurationMillis, easing = MoveEase),
++                            animationSpec = spring(EditStateDamping, EditStateStiffness),
+                             initialOffsetX = { actionSlideDistancePx },
+                         ) +
+-                        fadeIn(animationSpec = tween(ActionAlphaDurationMillis, easing = MoveEase)),
+-                    exit = shrinkHorizontally(animationSpec = tween(BackgroundResizeDurationMillis, easing = MoveEase)) +
++                        scaleIn(animationSpec = spring(EditStateDamping, EditStateStiffness), initialScale = 0.5f) +
++                        fadeIn(animationSpec = spring(dampingRatio = 1f, stiffness = EditStateStiffness)),
++                    exit = shrinkHorizontally(animationSpec = spring(EditStateDamping, EditStateStiffness)) +
+                         slideOutHorizontally(
+-                            animationSpec = tween(ActionOffsetDurationMillis, easing = MoveEase),
++                            animationSpec = spring(EditStateDamping, EditStateStiffness),
+                             targetOffsetX = { actionSlideDistancePx },
+                         ) +
+-                        fadeOut(animationSpec = tween(ActionAlphaDurationMillis, easing = MoveEase)),
++                        scaleOut(animationSpec = spring(EditStateDamping, EditStateStiffness), targetScale = 0.5f) +
++                        fadeOut(animationSpec = spring(dampingRatio = 1f, stiffness = EditStateStiffness)),
+                 ) {
+                     Box(
+                         modifier = Modifier.padding(
+@@ -1235,10 +1240,11 @@ private fun materialBarColor(): Color = if (COUITheme.colorScheme.background.lum
+     Color(0x99FFFFFF)
+ }
+ 
+-private val MoveEase = CubicBezierEasing(0.3f, 0f, 0.1f, 1f)
+-private val BackgroundResizeDurationMillis = 450
+-private val ActionOffsetDurationMillis = 400
+-private val ActionAlphaDurationMillis = 350
++/** StateChangedToEditParamsHigh / ToNormal: bounce 0.25 → damping ratio 0.75. */
++private const val EditStateDamping = 0.75f
++
++/** The same spring's response 0.5 → stiffness (2π / 0.5)². */
++private const val EditStateStiffness = 157.91f
+ private val ActionSlideDistance = 60.dp
+ 
+ @Composable
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt
+index 47dcf32..57bab88 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Slider.kt
+@@ -293,9 +293,11 @@ fun VerticalSlider(
+ 
+     val progressAnimationSpec = remember(isDragging) {
+         if (isDragging) {
+-            spring(dampingRatio = 0.9f, stiffness = 1755f)
++            // COUISeekBarAdvanced.R0: drag-follow spring, bounce 0 / response 0.15.
++            spring(dampingRatio = 1f, stiffness = 1754.6f)
+         } else {
+-            spring<Float>(dampingRatio = 0.96f, stiffness = 322f)
++            // COUISeekBar click spring: CLICK_SPRING_RESPONSE 0.3, SPRING_BOUNCE 0.
++            spring<Float>(dampingRatio = 1f, stiffness = 438.65f)
+         }
+     }
+ 
+@@ -601,9 +603,11 @@ fun RangeSlider(
+ 
+     val progressAnimationSpec = remember(isDragging) {
+         if (isDragging) {
+-            spring(dampingRatio = 0.9f, stiffness = 1755f)
++            // COUISeekBarAdvanced.R0: drag-follow spring, bounce 0 / response 0.15.
++            spring(dampingRatio = 1f, stiffness = 1754.6f)
+         } else {
+-            spring<Float>(dampingRatio = 0.96f, stiffness = 322f)
++            // COUISeekBar click spring: CLICK_SPRING_RESPONSE 0.3, SPRING_BOUNCE 0.
++            spring<Float>(dampingRatio = 1f, stiffness = 438.65f)
+         }
+     }
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Snackbar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Snackbar.kt
+index 5af8244..b1331f1 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Snackbar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/Snackbar.kt
+@@ -58,6 +58,7 @@ import androidx.compose.ui.input.pointer.pointerInput
+ import androidx.compose.ui.layout.onSizeChanged
+ import androidx.compose.ui.platform.AccessibilityManager
+ import androidx.compose.ui.platform.LocalAccessibilityManager
++import androidx.compose.ui.platform.LocalWindowInfo
+ import androidx.compose.ui.platform.LocalLayoutDirection
+ import androidx.compose.ui.semantics.LiveRegionMode
+ import androidx.compose.ui.semantics.liveRegion
+@@ -288,8 +289,10 @@ fun SnackbarHost(
+             reverseLayout = true,
+             verticalArrangement = Arrangement.Top,
+             horizontalAlignment = Alignment.CenterHorizontally,
+-            // 28dp + the 4dp item padding = 32dp bottom offset (COUI coui_snack_bar_margin_bottom).
+-            contentPadding = PaddingValues(bottom = 28.dp),
++            // The 4dp item padding is part of COUI coui_snack_bar_margin_bottom, so subtract it.
++            contentPadding = PaddingValues(
++                bottom = SnackbarDefaults.bottomMargin(LocalWindowInfo.current.containerDpSize.height) - 4.dp,
++            ),
+         ) {
+             itemsIndexed(state.currentSnackbars, key = { _, entry -> entry.id }) { index, entry ->
+                 val visibleState = remember { MutableTransitionState(false) }
+@@ -614,6 +617,17 @@ internal class SnackbarSingleLineShape(private val squircleEnabled: Boolean) : S
+  * Defaults for [Snackbar].
+  */
+ object SnackbarDefaults {
++    /**
++     * The distance from the host's bottom edge to the bar, `coui_snack_bar_margin_bottom` by window
++     * height: 88dp from 480dp up (values-h480dp, the phone case, which clears a floating bottom
++     * bar), 64dp from 280dp, 32dp below that.
++     */
++    fun bottomMargin(windowHeight: Dp): Dp = when {
++        windowHeight >= 480.dp -> 88.dp
++        windowHeight >= 280.dp -> 64.dp
++        else -> 32.dp
++    }
++
+     /** The default corner radius when the message spans multiple lines (COUI coui_snack_bar_radius / couiRoundCornerL). */
+     val CornerRadius = 16.dp
+ 
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopAppBar.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopAppBar.kt
+index 1ad6a77..957638a 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopAppBar.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/basic/TopAppBar.kt
+@@ -8,10 +8,13 @@ import androidx.compose.animation.core.AnimationSpec
+ import androidx.compose.animation.core.AnimationState
+ import androidx.compose.animation.core.CubicBezierEasing
+ import androidx.compose.animation.core.DecayAnimationSpec
+-import androidx.compose.animation.core.Easing
+ import androidx.compose.animation.core.animateDecay
+ import androidx.compose.animation.core.animateTo
+ import androidx.compose.animation.core.tween
++import androidx.compose.animation.core.SpringSpec
++import androidx.compose.animation.core.spring
++import androidx.compose.runtime.snapshotFlow
++import kotlinx.coroutines.flow.collectLatest
+ import androidx.compose.animation.rememberSplineBasedDecay
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.basicMarquee
+@@ -796,15 +799,17 @@ fun SmallTopAppBar(
+  *   list instead of waiting for the list to reach its top. `true` is the continuous Material3
+  *   behavior: the bar expands by the drag distance wherever the list is, which also keeps the
+  *   material alpha — driven by the content displacement — from dipping while the bar grows.
+- *   `false` (default) pins the title to the toolbar row while the content is scrolled and snaps it
+- *   back into the large-title row only at the top, matching the ColorOS notes/settings headers.
++ *   `false` (default) collapses the header as the list is pushed up, following the list's own
++ *   displacement with COUICollapsableAppBarLayout's springs (0.2 up / 0.1 down), and only grows it
++ *   back near the top of the list, as the ColorOS 17 Settings header does. A [snapAnimationSpec]
++ *   other than the default switches to the two-state snap.
+  */
+ @Suppress("ComposableNaming")
+ @Composable
+ fun COUIScrollBehavior(
+     state: TopAppBarState = rememberTopAppBarState(),
+     canScroll: () -> Boolean = { true },
+-    snapAnimationSpec: AnimationSpec<Float>? = tween(durationMillis = SnapAnimationDuration, easing = SnapAnimationEasing),
++    snapAnimationSpec: AnimationSpec<Float>? = FollowListAttachSpring,
+     flingAnimationSpec: DecayAnimationSpec<Float>? = rememberSplineBasedDecay(),
+     expandOnContentScroll: Boolean = false,
+ ): ScrollBehavior = remember(state, canScroll, snapAnimationSpec, flingAnimationSpec, expandOnContentScroll) {
+@@ -1461,14 +1466,40 @@ private fun TopAppBarLayout(
+     val snapFraction = remember(scrollBehavior, snapsToTop) {
+         Animatable(if (snapsToTop && collapsedTarget) 1f else 0f)
+     }
+-    LaunchedEffect(scrollBehavior, snapsToTop, collapsedTarget) {
++    // COUICollapsableAppBarLayout.ScrollBehavior: the header follows the list with a spring
++    // (followListResponseUp 0.2 while the list is pushed up, followListResponseDown 0.1 while it
++    // is pulled down, bounce 0) rather than jumping between the two states. The bar never consumes
++    // the scroll here, so the list keeps moving 1:1 under the finger and the collapse fraction is
++    // the list's own displacement over the collapse distance. Exit-until-collapsed still holds: the
++    // displacement is only small again near the top of the list. A custom snapAnimationSpec, or
++    // forceCollapsed, keeps the old two-state transition.
++    LaunchedEffect(scrollBehavior, snapsToTop, forceCollapsed) {
+         if (!snapsToTop) {
+             snapFraction.snapTo(0f)
+-        } else {
++            return@LaunchedEffect
++        }
++        val customSpec = scrollBehavior.snapAnimationSpec?.takeIf { it != FollowListAttachSpring }
++        if (customSpec != null || forceCollapsed) {
++            snapshotFlow { collapsedTarget }.collectLatest { collapsed ->
++                snapFraction.animateTo(
++                    targetValue = if (collapsed) 1f else 0f,
++                    animationSpec = customSpec ?: FollowListAttachSpring,
++                )
++            }
++            return@LaunchedEffect
++        }
++        snapshotFlow {
++            val state = scrollBehavior.state
++            val distance = (-state.heightOffsetLimit).takeIf { it > 0f }
++            if (distance == null) {
++                if (state.contentOffset < -1f) 1f else 0f
++            } else {
++                (-state.contentOffset / distance).coerceIn(0f, 1f)
++            }
++        }.collectLatest { target ->
+             snapFraction.animateTo(
+-                targetValue = if (collapsedTarget) 1f else 0f,
+-                animationSpec = scrollBehavior.snapAnimationSpec
+-                    ?: tween(durationMillis = SnapAnimationDuration, easing = SnapAnimationEasing),
++                targetValue = target,
++                animationSpec = if (target >= snapFraction.value) FollowListUpSpring else FollowListDownSpring,
+             )
+         }
+     }
+@@ -2415,14 +2446,17 @@ private val FadedLargeTitleScale = 0.7f
+  */
+ private val CollapsingTitleEasing = CubicBezierEasing(0.33f, 0f, 0.67f, 1f)
+ 
++/** `followListResponseUp` 0.2, bounce 0: the header following a list pushed up. */
++private val FollowListUpSpring = spring<Float>(dampingRatio = 1f, stiffness = 986.96f)
++
++/** `followListResponseDown` 0.1, bounce 0: the header following a list pulled down. */
++private val FollowListDownSpring = spring<Float>(dampingRatio = 1f, stiffness = 3947.84f)
++
+ /**
+- * The duration of the snap animation that settles the bar after a drag or fling
+- * (AppBarLayout.BaseBehavior.animateOffsetTo for the app bar's snap distance).
++ * `attachResponse` 0.25, bounce 0: COUICollapsableAppBarLayout.animateOffsetWithDuration ignores
++ * the duration and settles with this spring.
+  */
+-private val SnapAnimationDuration = 180
+-
+-/** The DecelerateInterpolator that AppBarLayout.BaseBehavior installs on its offset animator. */
+-private val SnapAnimationEasing = Easing { fraction -> 1f - (1f - fraction) * (1f - fraction) }
++internal val FollowListAttachSpring: SpringSpec<Float> = spring(dampingRatio = 1f, stiffness = 631.65f)
+ 
+ /**
+  * The collapsed fraction at which the morphing large title is swapped for the dedicated
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/motion/CouiSearchMotion.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/motion/CouiSearchMotion.kt
+index b8e9be4..f49aef0 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/motion/CouiSearchMotion.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/motion/CouiSearchMotion.kt
+@@ -57,7 +57,8 @@ internal class CouiSearchMotion(
+         // Only update target while running so velocity is preserved without cancelling.
+         searchSpring.animateTo(
+             target = target,
+-            response = if (value) 0.55f else 0.45f,
++            // IconExpandToEditParamsHigh 0.55 / IconCollapseToNormalParamsHigh 0.5 (bounce 0.2).
++            response = if (value) 0.55f else 0.5f,
+             bounce = 0.2f,
+             minimumChange = 0.001f,
+             onFrame = { next -> progress = next / 1000f },
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarSearchPairGeometry.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarSearchPairGeometry.kt
+index 556612a..24539b2 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarSearchPairGeometry.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/kit/topappbar/CouiTopAppBarSearchPairGeometry.kt
+@@ -33,7 +33,9 @@ internal fun topAppBarSearchPairGeometry(
+     return CouiTopAppBarSearchPairGeometry(
+         inputBounds = Rect(inputLeft, 0f, inputLeft + inputWidth, height),
+         actionBounds = Rect(mirroredActionLeft, 0f, mirroredActionLeft + actionWidth, height),
+-        actionScale = .5f + .5f * fraction,
+-        actionAlpha = (fraction / .2f).coerceIn(0f, 1f),
++        // COUISearchBar icon expand / collapse: the cancel button stays hidden up to 5% progress,
++        // then scales from mFunctionalInitScaleExpand (0.6) and fades in linearly with progress.
++        actionScale = if (fraction <= .05f) 0f else .6f + .4f * fraction,
++        actionAlpha = if (fraction <= .05f) 0f else fraction,
+     )
+ }
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/AlertDialogLayout.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/AlertDialogLayout.kt
+index 153bb58..c79ee4b 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/AlertDialogLayout.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/AlertDialogLayout.kt
+@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.luminance
++import androidx.compose.ui.platform.LocalWindowInfo
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.DpSize
+ import androidx.compose.ui.unit.dp
+@@ -38,6 +39,13 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
+  * (the tiny background is a bare inset-free shape) and closes with the full-width tiny capsules of
+  * `coui_center_alert_dialog_button_panel_tiny.xml`.
+  *
++ * [AlertDialogStyle.Bottom] is the same panel with window gravity `bottom` and
++ * `Animation.COUI.Dialog` (the 250ms slide up from below, 250ms slide out) on compact windows, and
++ * the centered presentation once the smallest window side reaches 480dp. That is what ColorOS 17
++ * apps do for confirmations on phones: Files 17.10.4 (`t8.f`: gravity 80 below sw480, centered
++ * Alpha style above), and the delete / repeat-alarm / account prompts of Files, Clock and the
++ * account center measured on a ColorOS 17.0.1 phone all sit at the bottom edge.
++ *
+  * `.Rotate`, `.ListDialog` and `.PhotoPage` are not ported. None of the system apps on the
+  * reference build reference the first two; `.PhotoPage` pairs the *bottom* layout with center
+  * gravity and is used by the gallery's photo page alone.
+@@ -84,6 +92,7 @@ internal fun AlertDialogContentLayout(
+     neutralText: String? = null,
+     onNeutral: (() -> Unit)? = null,
+     recommendedButton: AlertDialogButton? = null,
++    dangerButton: AlertDialogButton? = null,
+     style: AlertDialogStyle = AlertDialogStyle.Center,
+     colors: AlertDialogColors = AlertDialogDefaults.alertDialogColors(),
+     enableWindowDim: Boolean = true,
+@@ -91,7 +100,9 @@ internal fun AlertDialogContentLayout(
+     cornerRadius: Dp? = null,
+     maxWidth: Dp = AlertDialogDefaults.MaxWidth,
+     topInset: Dp? = null,
+-    buttonColors: TextButtonColors = DialogButtonBarDefaults.buttonColors(),
++    // Null resolves inside the dialog: a window dialog only sees the host-window backdrop there,
++    // so a default taken in the host composition would always pick the unfrosted fill.
++    buttonColors: TextButtonColors? = null,
+     recommendColors: TextButtonColors = ButtonDefaults.textButtonColorsPrimary(),
+     content: (@Composable () -> Unit)? = null,
+ ) {
+@@ -99,30 +110,35 @@ internal fun AlertDialogContentLayout(
+     val currentOnCancel by rememberUpdatedState(onCancel)
+     val currentOnNeutral by rememberUpdatedState(onNeutral)
+     val tiny = style == AlertDialogStyle.CenterTiny
++    val bottomOnCompact = style == AlertDialogStyle.Bottom
++    val windowSize = LocalWindowInfo.current.containerDpSize
++    val wideEnoughToCenter = minOf(windowSize.width, windowSize.height) >= AlertDialogDefaults.BottomStyleCenterMinWidth
+ 
++    // The danger action rides on the bar's recommend tier, recoloured inside the dialog below.
++    val highlighted = dangerButton ?: recommendedButton
+     val requestCancel = remember { { currentOnCancel() } }
+-    val cancelAction = remember(cancelText, requestCancel, recommendedButton) {
++    val cancelAction = remember(cancelText, requestCancel, highlighted) {
+         DialogButtonBarAction(
+             text = cancelText,
+             onClick = requestCancel,
+-            recommended = recommendedButton == AlertDialogButton.Negative,
++            recommended = highlighted == AlertDialogButton.Negative,
+         )
+     }
+-    val confirmAction = remember(confirmText, recommendedButton) {
++    val confirmAction = remember(confirmText, highlighted) {
+         DialogButtonBarAction(
+             text = confirmText,
+             onClick = { currentOnConfirm() },
+-            recommended = recommendedButton == AlertDialogButton.Positive,
++            recommended = highlighted == AlertDialogButton.Positive,
+         )
+     }
+     val neutralAction = if (neutralText == null) {
+         null
+     } else {
+-        remember(neutralText, recommendedButton) {
++        remember(neutralText, highlighted) {
+             DialogButtonBarAction(
+                 text = neutralText,
+                 onClick = { currentOnNeutral?.invoke() },
+-                recommended = recommendedButton == AlertDialogButton.Neutral,
++                recommended = highlighted == AlertDialogButton.Neutral,
+             )
+         }
+     }
+@@ -150,8 +166,12 @@ internal fun AlertDialogContentLayout(
+         defaultWindowInsetsPadding = !tiny,
+         // `COUIAlertDialogBuilder` keeps the centered presentation on every window size, so the
+         // large-screen auto switch of DialogContentLayout is bypassed.
+-        forceCentered = !tiny,
+-        largeScreen = if (tiny) false else null,
++        forceCentered = !tiny && !bottomOnCompact,
++        largeScreen = when {
++            tiny -> false
++            bottomOnCompact -> wideEnoughToCenter
++            else -> null
++        },
+         maxWidth = maxWidth,
+         cornerRadius = cornerRadius,
+         bottomCornerRadius = if (tiny) 0.dp else null,
+@@ -203,8 +223,8 @@ internal fun AlertDialogContentLayout(
+                     else -> AlertDialogDefaults.ButtonBarMarginTop
+                 },
+             ),
+-            colors = buttonColors,
+-            recommendColors = recommendColors,
++            colors = buttonColors ?: DialogButtonBarDefaults.buttonColors(),
++            recommendColors = if (dangerButton != null) DialogButtonBarDefaults.dangerButtonColors() else recommendColors,
+         )
+     }
+ }
+@@ -212,6 +232,12 @@ internal fun AlertDialogContentLayout(
+ @ExperimentalCOUIApi
+ object AlertDialogDefaults {
+ 
++    /**
++     * The smallest window side from which [AlertDialogStyle.Bottom] switches to the centered
++     * presentation (the sw480 split of ColorOS 17 Files).
++     */
++    val BottomStyleCenterMinWidth = 480.dp
++
+     /** The default confirm (positive) button label. */
+     val ConfirmText = "OK"
+ 
+@@ -393,6 +419,12 @@ enum class AlertDialogStyle {
+ 
+     /** `AlertDialogBuildStyle.Center.Tiny`: a compact panel pinned to the bottom edge. */
+     CenterTiny,
++
++    /**
++     * `COUIAlertDialog.Bottom`: the regular panel at the bottom edge with the bottom slide on
++     * compact windows (smallest side below 480dp), centered on wider ones.
++     */
++    Bottom,
+ }
+ 
+ /**
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt
+index b82a524..5f07dae 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/BottomSheetContentLayout.kt
+@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
+ import androidx.compose.animation.core.CubicBezierEasing
+ import androidx.compose.animation.core.SpringSpec
+ import androidx.compose.animation.core.animate
++import androidx.compose.animation.core.spring
+ import androidx.compose.animation.core.tween
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.clickable
+@@ -315,7 +316,6 @@ internal fun BottomSheetContentLayout(
+                             dragOffsetY = dragOffsetY,
+                             sheetHeightPx = sheetHeightPx.intValue,
+                             windowHeightPx = windowHeightPx,
+-                            peekPx = with(density) { PanelPeekHeight.toPx() },
+                             dimAlpha = dimAlpha,
+                         ) {
+                             requestDismiss()
+@@ -533,9 +533,12 @@ internal fun BottomSheetContent(
+         (total - imePx).coerceAtLeast(1f)
+     }
+ 
+-    val updateDimAlpha = remember(allowDismiss, density) {
++    // COUIBottomSheetBehavior.calculatePanelOutsideAlpha: 1 - (top - expandedOffset) / parentHeight.
++    // The divisor is the parent (window) height, not the panel's, so a short panel dragged to the
++    // bottom edge still leaves most of the scrim; the rest fades out with the dismiss animation.
++    val updateDimAlpha = remember(allowDismiss, density, currentWindowHeight) {
+         { offset: Float ->
+-            val thresholdPx = if (sheetHeightPx.intValue > 0) visibleSheetHeightPx() else 500f
++            val thresholdPx = with(density) { currentWindowHeight.toPx() }.takeIf { it > 0f } ?: 500f
+             val alpha = if (offset >= 0 && allowDismiss) {
+                 1f - (offset / thresholdPx).coerceIn(0f, 1f)
+             } else {
+@@ -554,17 +557,13 @@ internal fun BottomSheetContent(
+                 val currentOffset = dragOffsetY.value
+                 val windowHeightPx = with(density) { currentWindowHeight.toPx() }
+                 val visiblePx = visibleSheetHeightPx()
+-                // COUIBottomSheetBehavior.shouldHide only releases the panel once it sits below the
+-                // collapsed (peek) offset — that is, once almost the whole panel has been dragged
+-                // off-screen — and then also requires a fling or a drag past half the screen. On a
+-                // tall panel the first condition is barely reachable, so the panel reads as
+-                // impossible to dismiss. Closing after `dismissOffsetFraction` of the panel's
+-                // visible height above the IME, with the 0.1s release projection counted in, is
+-                // what the gesture implies; a downward fling of `SIGNIFICANT_VELOCITY_PX` still
+-                // dismisses at any travel.
+-                val projected = currentOffset + velocity * VELOCITY_PROJECTION_SECONDS
++                // COUIBottomSheetDialog skips the collapsed state (skipCollapsed = true), so
++                // COUIBottomSheetBehavior's drag callback hides the panel when it is released
++                // below the midpoint of its visible height (`releasedLow`: top > (parentHeight +
++                // expandedOffset) / 2) or flung down faster than 500 px/s (with |vx| < |vy|).
++                // There is no release projection.
+                 val shouldDismiss = allowDismiss && sheetHeightPx.intValue > 0 &&
+-                    (projected >= visiblePx * dismissOffsetFraction || velocity > SIGNIFICANT_VELOCITY_PX)
++                    (currentOffset >= visiblePx * dismissOffsetFraction || velocity > SIGNIFICANT_VELOCITY_PX)
+ 
+                 try {
+                     if (shouldDismiss) {
+@@ -575,7 +574,6 @@ internal fun BottomSheetContent(
+                                 dragOffsetY = dragOffsetY,
+                                 sheetHeightPx = sheetHeightPx.intValue,
+                                 windowHeightPx = windowHeightPx,
+-                                peekPx = with(density) { PanelPeekHeight.toPx() },
+                                 dimAlpha = dimAlpha,
+                                 velocity = velocity,
+                             ) {
+@@ -586,7 +584,15 @@ internal fun BottomSheetContent(
+                         val effectiveVelocity = if (!allowDismiss && velocity > 0) 0f else velocity
+                         dragOffsetY.animateTo(
+                             targetValue = 0f,
+-                            animationSpec = folmeSpring(damping = 1f, response = 0.4f),
++                            // Back from a pull-up: COUIBottomSheetDialog.doSpringBackReboundAnim, a
++                            // Rebound spring from bounciness 6 / speed 42 (k ≈ 979, ζ ≈ 0.69, a small
++                            // overshoot). Back from a downward drag: the behavior's settle spring,
++                            // response 0.4 with no bounce.
++                            animationSpec = if (currentOffset < 0f) {
++                                spring(dampingRatio = PULL_UP_REBOUND_DAMPING, stiffness = PULL_UP_REBOUND_STIFFNESS)
++                            } else {
++                                folmeSpring(damping = 1f, response = 0.4f)
++                            },
+                             initialVelocity = effectiveVelocity,
+                         ) {
+                             updateDimAlpha(value)
+@@ -1057,8 +1063,13 @@ private val PanelPullUpMaxOffset = 28.dp
+ /** `COUIBottomSheetDialog`'s pull-up listener moves the parent padding by 0.2 of the drag. */
+ private const val PULL_UP_FRICTION = 0.2f
+ 
++/** Rebound `SpringConfig.fromBouncinessAndSpeed(6, 42)` converted to a mass-1 spring (tension ≈ 979). */
++private const val PULL_UP_REBOUND_STIFFNESS = 979f
++
++/** Damping ratio of the same Rebound spring (friction ≈ 43 → ζ ≈ 0.69). */
++private const val PULL_UP_REBOUND_DAMPING = 0.69f
++
+ /** `COUIBottomSheetBehavior` projects the release velocity 0.1s ahead before comparing. */
+-private const val VELOCITY_PROJECTION_SECONDS = 0.1f
+ 
+ /** `COUIBottomSheetBehavior.onViewReleased`'s `f4 > 500.0f` downward-fling threshold, in px/s. */
+ private const val SIGNIFICANT_VELOCITY_PX = 500f
+@@ -1151,7 +1162,9 @@ private fun DragHandleArea(
+ 
+     // COUI panels without a visible handle still reserve a strip at the top, so the first content
+     // row keeps the same offset from the panel edge as a handled panel.
+-    val stripHeight = if (showDragHandle) 24.dp else HiddenHandleStripHeight
++    // With a handle the toolbar starts 16dp below the panel edge (coui_panel_view_layout.xml); the
++    // 36x4dp bar sits 4dp from the top and its 70x20dp press background may overflow the strip.
++    val stripHeight = if (showDragHandle) 16.dp else HiddenHandleStripHeight
+ 
+     Column(
+         modifier = Modifier
+@@ -1207,7 +1220,7 @@ private fun DragHandleArea(
+ }
+ 
+ /** Vertical padding applied to the centered title block inside [TitleAndActionsRow]. */
+-private val SheetTitlePaddingVertical = 10.dp
++private val SheetTitlePaddingVertical = 12.dp
+ 
+ /**
+  * Single-row panel toolbar aligned with `upstream/coui17` (`Widget.COUI.Toolbar.Panel`):
+@@ -1238,8 +1251,10 @@ private fun TitleAndActionsRow(
+                                 color = COUITheme.colorScheme.onBackground,
+                                 textAlign = TextAlign.Center,
+                                 overflow = TextOverflow.Ellipsis,
+-                                maxLines = 1,
+-                                style = COUITheme.textStyles.title4,
++                                // Widget.COUI.Toolbar.Panel title: up to two lines, textFontWeight 550
++                                // (sans-serif-medium overridden by the inherited weight on API 28+).
++                                maxLines = 2,
++                                style = COUITheme.textStyles.title4.copy(fontWeight = FontWeight(550)),
+                             )
+                         }
+                         if (subtitle != null) {
+@@ -1297,25 +1312,30 @@ private suspend fun CoroutineScope.animateDismissOffScreen(
+     dragOffsetY: Animatable<Float, *>,
+     sheetHeightPx: Int,
+     windowHeightPx: Float,
+-    peekPx: Float,
+     dimAlpha: MutableFloatState,
+     velocity: Float = 0f,
+     onDismiss: () -> Unit,
+ ) {
+     val sheetHeight = sheetHeightPx.toFloat()
+-    val thresholdPx = if (sheetHeight > 0) sheetHeight else 500f
++    val startOffset = dragOffsetY.value
++    val startAlpha = dimAlpha.floatValue
++    // The scrim left over from the drag (parent-height divisor) fades out as the panel leaves.
++    val fadeSpanPx = (if (sheetHeight > 0) sheetHeight else windowHeightPx) - startOffset
++    // COUIBottomSheetBehavior.startSettleRunnable(STATE_HIDDEN): response 0.18 + 0.19 × the share
++    // of the parent still covered by the panel at release, so a panel dragged further leaves faster.
++    val remainingFraction = if (windowHeightPx > 0f && sheetHeight > 0f) {
++        ((sheetHeight - startOffset) / windowHeightPx).coerceIn(0f, 1f)
++    } else {
++        1f
++    }
+     val settleJob = launch {
+         dragOffsetY.animateTo(
+             targetValue = windowHeightPx,
+-            animationSpec = couiPanelSlideSpring(
+-                entering = false,
+-                travelPx = if (sheetHeight > 0) sheetHeight else windowHeightPx,
+-                containerPx = windowHeightPx,
+-                peekPx = peekPx,
+-            ),
++            animationSpec = folmeSpring(damping = 1f, response = 0.18f + 0.19f * remainingFraction),
+             initialVelocity = velocity,
+         ) {
+-            dimAlpha.floatValue = (1f - (value / thresholdPx).coerceIn(0f, 1f))
++            val progress = if (fadeSpanPx > 0f) ((value - startOffset) / fadeSpanPx).coerceIn(0f, 1f) else 1f
++            dimAlpha.floatValue = startAlpha * (1f - progress)
+         }
+     }
+     snapshotFlow { dragOffsetY.value }
+@@ -1570,12 +1590,15 @@ object BottomSheetDefaults {
+     val DismissOffsetFraction = 0.5f
+ 
+     /**
+-     * The height of the title row, `coui_list_dialog_toolbar_height` = 50dp.
++     * The height of the title row, `toolbar_min_height` = 52dp for panel toolbars.
+      *
+      * A COUI panel's title bar is a `COUIToolbar` laid out at this fixed height, so the action
+-     * buttons sit on the panel's vertical centre line rather than on a padding-derived row.
++     * buttons sit on the panel's vertical centre line rather than on a padding-derived row. With the
++     * 10dp top strip the buttons' centre lands 36dp below the panel edge, as measured on a ColorOS
++     * 17.0.1 phone (Clock's new-alarm panel). `COUIListBottomSheetDialog` alone uses 50dp
++     * (`coui_list_dialog_toolbar_height`).
+      */
+-    val HeaderHeight = 50.dp
++    val HeaderHeight = 52.dp
+ 
+     /**
+      * Height of the top transparent fading edge applied to scrolled sheet content.
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
+index 92de93d..94e711b 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/layout/DialogContentLayout.kt
+@@ -575,9 +575,9 @@ internal fun DialogContent(
+                         .padding(top = insideMargin.height, bottom = titleBottomMargin ?: TitleMarginBottom),
+                     text = it,
+                     fontSize = titleFontSize,
+-                    // COUIDialogTextAppearance.Title overrides couiTextHeadlineS with
+-                    // sans-serif-semibold.
+-                    fontWeight = FontWeight.SemiBold,
++                    // COUIDialogTextAppearance.Title sets sans-serif-semibold, but the textFontWeight
++                    // 550 it inherits from couiTextHeadlineS wins on API 28+.
++                    fontWeight = FontWeight(550),
+                     textAlign = TextAlign.Center,
+                     lineHeight = DialogLineHeight,
+                     color = titleColor,
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/Pressable.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/Pressable.kt
+index d306df2..6651d96 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/Pressable.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/utils/Pressable.kt
+@@ -141,7 +141,7 @@ internal inline fun Modifier.pressableWithIndicationIfNeeded(
+  * How long to wait before appearing 'pressed' (emitting [PressInteraction.Press]) - if a touch down
+  * will quickly become a drag / scroll, this timeout means that we don't show a press effect.
+  */
+-internal const val TAP_INDICATION_DELAY: Long = 150L
++internal const val TAP_INDICATION_DELAY: Long = 100L // AOSP ViewConfiguration.TAP_TIMEOUT
+ 
+ private data class PressableElement(
+     private val interactionSource: MutableInteractionSource?,
+diff --git a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/window/WindowAlertDialog.kt b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/window/WindowAlertDialog.kt
+index 69eb6fd..1bf5dfa 100644
+--- a/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/window/WindowAlertDialog.kt
++++ b/coui-ui/src/commonMain/kotlin/io/github/suqi8/coui/kmp/window/WindowAlertDialog.kt
+@@ -49,7 +49,11 @@ import io.github.suqi8.coui.kmp.utils.rememberHostWindowBackdrop
+  * @param recommendedButton The action drawn as the recommend (filled primary) button, matching the
+  *   `boolean` overload of the native builder's button setters.
+  * @param style The Center-family build style: [AlertDialogStyle.Center] floats the panel in the
+- *   middle of the window, [AlertDialogStyle.CenterTiny] pins a compact panel to the bottom edge.
++ *   middle of the window, [AlertDialogStyle.CenterTiny] pins a compact panel to the bottom edge,
++ *   [AlertDialogStyle.Bottom] sits at the bottom edge on phones and centres on wider windows.
++ * @param dangerButton The action that deletes or discards something; its capsule keeps the
++ *   translucent fill and takes the red label (`color_delete_alert_dialog_button_warning_color`),
++ *   as Files' delete confirmation does. Takes precedence over [recommendedButton].
+  * @param colors The [AlertDialogColors] of the title, message and panel.
+  * @param enableWindowDim Whether to enable window dimming when the dialog is shown.
+  * @param onDismissFinished The callback when the [WindowAlertDialog] is completely dismissed.
+@@ -79,6 +83,7 @@ fun WindowAlertDialog(
+     onDismissFinished: (() -> Unit)? = null,
+     cornerRadius: Dp? = null,
+     maxWidth: Dp = AlertDialogDefaults.MaxWidth,
++    dangerButton: AlertDialogButton? = null,
+     content: (@Composable () -> Unit)? = null,
+ ) {
+     val statusBarsPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+@@ -117,6 +122,7 @@ fun WindowAlertDialog(
+         neutralText = neutralText,
+         onNeutral = onNeutral,
+         recommendedButton = recommendedButton,
++        dangerButton = dangerButton,
+         style = style,
+         colors = colors,
+         enableWindowDim = enableWindowDim,

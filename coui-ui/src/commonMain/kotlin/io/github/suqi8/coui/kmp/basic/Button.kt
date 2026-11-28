@@ -155,21 +155,21 @@ fun Button(
     val tintProgress = remember { Animatable(0f) }
     LaunchedEffect(enabled, isPressed) {
         if (enabled && isPressed) {
-            tintProgress.animateTo(1f, PressDownSpring)
+            tintProgress.animateTo(1f, PressTintSpring)
         } else if (!enabled) {
             tintProgress.snapTo(0f)
         } else if (tintProgress.value > 0f) {
             if (tintProgress.value < PressedTintMinVisibleProgress) {
                 // Keep the press-in animation running until the tint is clearly visible.
                 try {
-                    tintProgress.animateTo(1f, PressDownSpring) {
+                    tintProgress.animateTo(1f, PressTintSpring) {
                         if (value >= PressedTintMinVisibleProgress) throw PressTintThresholdReached()
                     }
                 } catch (_: PressTintThresholdReached) {
                     // Minimum visible progress reached; fall through to the fade-out.
                 }
             }
-            tintProgress.animateTo(0f, PressReleaseSpring)
+            tintProgress.animateTo(0f, PressTintSpring)
         }
     }
     val pressTint = if (isDark) PressedTintDark else PressedTintLight
@@ -677,10 +677,11 @@ object ButtonDefaults {
     val PressedBrightness = 0.8f
 
     /**
-     * The default min width applied for all buttons. Note that you can override it by applying
-     * Modifier.widthIn directly on the button composable.
+     * The default min width of a regular (Large) button, `coui_btn_large_width_min` = 132dp
+     * (`Widget.COUI.Button.Large`). Override it through the `minWidth` parameter or
+     * Modifier.widthIn.
      */
-    val MinWidth = 58.dp
+    val MinWidth = 132.dp
 
     /**
      * The default min height applied for all buttons. Note that you can override it by applying
@@ -966,16 +967,21 @@ data class TextButtonColors(
 )
 
 /**
- * The COUI press spring (COUIPressAnimatorUnit → PressEngineConfig responsePress 0.13 / bouncePress
- * 0.18, so dampingRatio = 1 - bounce and stiffness = (2π / response)²).
+ * The COUI press-scale spring: `PressParams.jellyPress` (bounce 0, response 0.25), which
+ * `COUIPressAnimatorUnit` installs over `PressEngineConfig`'s 0.13 / 0.18 defaults; dampingRatio =
+ * 1 - bounce, stiffness = (2π / response)².
  */
-private val PressDownSpring = spring<Float>(dampingRatio = 0.82f, stiffness = 2336f)
+private val PressDownSpring = spring<Float>(dampingRatio = 1f, stiffness = 631.65f)
+
+/** The hand-up scale spring, `PressParams.jellyHandup` (bounce 0.6, response 0.5). */
+private val PressReleaseSpring = spring<Float>(dampingRatio = 0.4f, stiffness = 157.91f)
 
 /**
- * The COUI release spring (PressEngineConfig responseRelease 0.35 / bounceRelease 0.62). The press
- * engine uses a separate, much bouncier curve for the hand-up.
+ * The press tint spring: `COUIButton` draws its pressed colour through `COUIMaskEffectDrawable`,
+ * whose press layer runs response 0.3 / bounce 0 both ways (same as list rows), so the tint never
+ * overshoots below zero on release.
  */
-private val PressReleaseSpring = spring<Float>(dampingRatio = 0.38f, stiffness = 322.3f)
+private val PressTintSpring = spring<Float>(dampingRatio = 1f, stiffness = 438.65f)
 
 /** couiColorPress in light themes (coui_color_press #1F000000). */
 private val PressedTintLight = Color(0x1F000000)

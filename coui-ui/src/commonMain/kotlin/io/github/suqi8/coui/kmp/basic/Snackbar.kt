@@ -58,6 +58,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.AccessibilityManager
 import androidx.compose.ui.platform.LocalAccessibilityManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -288,8 +289,10 @@ fun SnackbarHost(
             reverseLayout = true,
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally,
-            // 28dp + the 4dp item padding = 32dp bottom offset (COUI coui_snack_bar_margin_bottom).
-            contentPadding = PaddingValues(bottom = 28.dp),
+            // The 4dp item padding is part of COUI coui_snack_bar_margin_bottom, so subtract it.
+            contentPadding = PaddingValues(
+                bottom = SnackbarDefaults.bottomMargin(LocalWindowInfo.current.containerDpSize.height) - 4.dp,
+            ),
         ) {
             itemsIndexed(state.currentSnackbars, key = { _, entry -> entry.id }) { index, entry ->
                 val visibleState = remember { MutableTransitionState(false) }
@@ -614,6 +617,17 @@ internal class SnackbarSingleLineShape(private val squircleEnabled: Boolean) : S
  * Defaults for [Snackbar].
  */
 object SnackbarDefaults {
+    /**
+     * The distance from the host's bottom edge to the bar, `coui_snack_bar_margin_bottom` by window
+     * height: 88dp from 480dp up (values-h480dp, the phone case, which clears a floating bottom
+     * bar), 64dp from 280dp, 32dp below that.
+     */
+    fun bottomMargin(windowHeight: Dp): Dp = when {
+        windowHeight >= 480.dp -> 88.dp
+        windowHeight >= 280.dp -> 64.dp
+        else -> 32.dp
+    }
+
     /** The default corner radius when the message spans multiple lines (COUI coui_snack_bar_radius / couiRoundCornerL). */
     val CornerRadius = 16.dp
 

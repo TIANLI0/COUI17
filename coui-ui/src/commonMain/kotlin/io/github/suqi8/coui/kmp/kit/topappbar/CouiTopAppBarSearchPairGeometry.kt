@@ -33,7 +33,9 @@ internal fun topAppBarSearchPairGeometry(
     return CouiTopAppBarSearchPairGeometry(
         inputBounds = Rect(inputLeft, 0f, inputLeft + inputWidth, height),
         actionBounds = Rect(mirroredActionLeft, 0f, mirroredActionLeft + actionWidth, height),
-        actionScale = .5f + .5f * fraction,
-        actionAlpha = (fraction / .2f).coerceIn(0f, 1f),
+        // COUISearchBar icon expand / collapse: the cancel button stays hidden up to 5% progress,
+        // then scales from mFunctionalInitScaleExpand (0.6) and fades in linearly with progress.
+        actionScale = if (fraction <= .05f) 0f else .6f + .4f * fraction,
+        actionAlpha = if (fraction <= .05f) 0f else fraction,
     )
 }

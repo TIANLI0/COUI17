@@ -254,6 +254,9 @@ private fun RowScope.ArrowPreferenceEndAction(
     }
     Image(
         modifier = Modifier
+            // coui_preference_widget_jump.xml: the arrow keeps support_preference_image_margin_start
+            // (4dp) from the status text / red dot before it.
+            .padding(start = 4.dp)
             // RTL mirroring is handled by the icon itself (autoMirror).
             .size(width = 12.dp, height = 24.dp)
             .align(Alignment.CenterVertically),

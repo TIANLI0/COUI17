@@ -6,12 +6,16 @@ package io.github.tianli0.coui17.patterns
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -26,6 +30,18 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
  * [FormDialog]. [GroupCard] uses the compact outlined variant against its own fill.
  */
 val LocalOnPageColor = staticCompositionLocalOf { false }
+
+/**
+ * Set by [FormDialog]: fields inside a dialog take COUIEditText's line form (no fill, a 0.33dp
+ * underline and the focused primary line), as ColorOS 17's input dialogs do (Files' new-folder and
+ * rename dialogs), and the first one takes focus with its text selected so the keyboard rises with
+ * the dialog.
+ */
+internal class DialogFieldScope {
+    var focusClaimed = false
+}
+
+internal val LocalDialogField = staticCompositionLocalOf<DialogFieldScope?> { null }
 
 /**
  * A `String`-based COUI text field that keeps selection and IME composition (which CJK input
@@ -54,7 +70,27 @@ fun TextInput(
     /** A password field: dots, with the eye key that reveals the text. */
     showPasswordToggle: Boolean = false,
 ) {
-    var tfv by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    val dialogField = LocalDialogField.current
+    // The first field of a dialog claims the initial focus, once.
+    val claimsFocus = remember {
+        if (dialogField != null && !dialogField.focusClaimed && enabled) {
+            dialogField.focusClaimed = true
+            true
+        } else {
+            false
+        }
+    }
+    val focusRequester = remember { FocusRequester() }
+    var tfv by remember {
+        mutableStateOf(TextFieldValue(value, if (claimsFocus) TextRange(0, value.length) else TextRange(value.length)))
+    }
+    if (claimsFocus) {
+        LaunchedEffect(Unit) {
+            // Wait for the dialog window to take input focus before asking for the IME.
+            withFrameNanos { }
+            runCatching { focusRequester.requestFocus() }
+        }
+    }
     // Only adopt the external value when the OWNER changed it (e.g. cleared after send); our own
     // edits reach the owner asynchronously and must not reset selection/composition meanwhile.
     var lastExternal by remember { mutableStateOf(value) }
@@ -68,9 +104,11 @@ fun TextInput(
             tfv = it
             if (it.text != value) onValueChange(it.text)
         },
-        modifier = modifier,
-        backgroundMode = TextFieldMode.Rectangle,
-        colors = TextFieldDefaults.textFieldColors(backgroundColor = containerColor),
+        modifier = modifier.focusRequester(focusRequester),
+        backgroundMode = if (dialogField != null) TextFieldMode.Line else TextFieldMode.Rectangle,
+        colors = TextFieldDefaults.textFieldColors(
+            backgroundColor = if (dialogField != null) Color.Transparent else containerColor,
+        ),
         cornerRadius = cornerRadius,
         showPasswordToggle = showPasswordToggle,
         label = label,

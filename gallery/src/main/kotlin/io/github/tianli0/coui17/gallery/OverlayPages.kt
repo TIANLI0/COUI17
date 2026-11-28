@@ -224,6 +224,7 @@ fun OverlaysPage(onSpecializedDialogs: () -> Unit) {
             last = deleted
         },
         onDismiss = { confirm = false },
+        destructive = true,
     )
 
     ChoiceDialog(

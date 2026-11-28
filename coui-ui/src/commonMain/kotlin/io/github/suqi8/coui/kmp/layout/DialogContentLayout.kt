@@ -575,9 +575,9 @@ internal fun DialogContent(
                         .padding(top = insideMargin.height, bottom = titleBottomMargin ?: TitleMarginBottom),
                     text = it,
                     fontSize = titleFontSize,
-                    // COUIDialogTextAppearance.Title overrides couiTextHeadlineS with
-                    // sans-serif-semibold.
-                    fontWeight = FontWeight.SemiBold,
+                    // COUIDialogTextAppearance.Title sets sans-serif-semibold, but the textFontWeight
+                    // 550 it inherits from couiTextHeadlineS wins on API 28+.
+                    fontWeight = FontWeight(550),
                     textAlign = TextAlign.Center,
                     lineHeight = DialogLineHeight,
                     color = titleColor,

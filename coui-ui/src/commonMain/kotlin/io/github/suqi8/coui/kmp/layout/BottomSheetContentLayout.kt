@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -315,7 +316,6 @@ internal fun BottomSheetContentLayout(
                             dragOffsetY = dragOffsetY,
                             sheetHeightPx = sheetHeightPx.intValue,
                             windowHeightPx = windowHeightPx,
-                            peekPx = with(density) { PanelPeekHeight.toPx() },
                             dimAlpha = dimAlpha,
                         ) {
                             requestDismiss()
@@ -533,9 +533,12 @@ internal fun BottomSheetContent(
         (total - imePx).coerceAtLeast(1f)
     }
 
-    val updateDimAlpha = remember(allowDismiss, density) {
+    // COUIBottomSheetBehavior.calculatePanelOutsideAlpha: 1 - (top - expandedOffset) / parentHeight.
+    // The divisor is the parent (window) height, not the panel's, so a short panel dragged to the
+    // bottom edge still leaves most of the scrim; the rest fades out with the dismiss animation.
+    val updateDimAlpha = remember(allowDismiss, density, currentWindowHeight) {
         { offset: Float ->
-            val thresholdPx = if (sheetHeightPx.intValue > 0) visibleSheetHeightPx() else 500f
+            val thresholdPx = with(density) { currentWindowHeight.toPx() }.takeIf { it > 0f } ?: 500f
             val alpha = if (offset >= 0 && allowDismiss) {
                 1f - (offset / thresholdPx).coerceIn(0f, 1f)
             } else {
@@ -554,17 +557,13 @@ internal fun BottomSheetContent(
                 val currentOffset = dragOffsetY.value
                 val windowHeightPx = with(density) { currentWindowHeight.toPx() }
                 val visiblePx = visibleSheetHeightPx()
-                // COUIBottomSheetBehavior.shouldHide only releases the panel once it sits below the
-                // collapsed (peek) offset — that is, once almost the whole panel has been dragged
-                // off-screen — and then also requires a fling or a drag past half the screen. On a
-                // tall panel the first condition is barely reachable, so the panel reads as
-                // impossible to dismiss. Closing after `dismissOffsetFraction` of the panel's
-                // visible height above the IME, with the 0.1s release projection counted in, is
-                // what the gesture implies; a downward fling of `SIGNIFICANT_VELOCITY_PX` still
-                // dismisses at any travel.
-                val projected = currentOffset + velocity * VELOCITY_PROJECTION_SECONDS
+                // COUIBottomSheetDialog skips the collapsed state (skipCollapsed = true), so
+                // COUIBottomSheetBehavior's drag callback hides the panel when it is released
+                // below the midpoint of its visible height (`releasedLow`: top > (parentHeight +
+                // expandedOffset) / 2) or flung down faster than 500 px/s (with |vx| < |vy|).
+                // There is no release projection.
                 val shouldDismiss = allowDismiss && sheetHeightPx.intValue > 0 &&
-                    (projected >= visiblePx * dismissOffsetFraction || velocity > SIGNIFICANT_VELOCITY_PX)
+                    (currentOffset >= visiblePx * dismissOffsetFraction || velocity > SIGNIFICANT_VELOCITY_PX)
 
                 try {
                     if (shouldDismiss) {
@@ -575,7 +574,6 @@ internal fun BottomSheetContent(
                                 dragOffsetY = dragOffsetY,
                                 sheetHeightPx = sheetHeightPx.intValue,
                                 windowHeightPx = windowHeightPx,
-                                peekPx = with(density) { PanelPeekHeight.toPx() },
                                 dimAlpha = dimAlpha,
                                 velocity = velocity,
                             ) {
@@ -586,7 +584,15 @@ internal fun BottomSheetContent(
                         val effectiveVelocity = if (!allowDismiss && velocity > 0) 0f else velocity
                         dragOffsetY.animateTo(
                             targetValue = 0f,
-                            animationSpec = folmeSpring(damping = 1f, response = 0.4f),
+                            // Back from a pull-up: COUIBottomSheetDialog.doSpringBackReboundAnim, a
+                            // Rebound spring from bounciness 6 / speed 42 (k ≈ 979, ζ ≈ 0.69, a small
+                            // overshoot). Back from a downward drag: the behavior's settle spring,
+                            // response 0.4 with no bounce.
+                            animationSpec = if (currentOffset < 0f) {
+                                spring(dampingRatio = PULL_UP_REBOUND_DAMPING, stiffness = PULL_UP_REBOUND_STIFFNESS)
+                            } else {
+                                folmeSpring(damping = 1f, response = 0.4f)
+                            },
                             initialVelocity = effectiveVelocity,
                         ) {
                             updateDimAlpha(value)
@@ -1057,8 +1063,13 @@ private val PanelPullUpMaxOffset = 28.dp
 /** `COUIBottomSheetDialog`'s pull-up listener moves the parent padding by 0.2 of the drag. */
 private const val PULL_UP_FRICTION = 0.2f
 
+/** Rebound `SpringConfig.fromBouncinessAndSpeed(6, 42)` converted to a mass-1 spring (tension ≈ 979). */
+private const val PULL_UP_REBOUND_STIFFNESS = 979f
+
+/** Damping ratio of the same Rebound spring (friction ≈ 43 → ζ ≈ 0.69). */
+private const val PULL_UP_REBOUND_DAMPING = 0.69f
+
 /** `COUIBottomSheetBehavior` projects the release velocity 0.1s ahead before comparing. */
-private const val VELOCITY_PROJECTION_SECONDS = 0.1f
 
 /** `COUIBottomSheetBehavior.onViewReleased`'s `f4 > 500.0f` downward-fling threshold, in px/s. */
 private const val SIGNIFICANT_VELOCITY_PX = 500f
@@ -1151,7 +1162,9 @@ private fun DragHandleArea(
 
     // COUI panels without a visible handle still reserve a strip at the top, so the first content
     // row keeps the same offset from the panel edge as a handled panel.
-    val stripHeight = if (showDragHandle) 24.dp else HiddenHandleStripHeight
+    // With a handle the toolbar starts 16dp below the panel edge (coui_panel_view_layout.xml); the
+    // 36x4dp bar sits 4dp from the top and its 70x20dp press background may overflow the strip.
+    val stripHeight = if (showDragHandle) 16.dp else HiddenHandleStripHeight
 
     Column(
         modifier = Modifier
@@ -1207,7 +1220,7 @@ private fun DragHandleArea(
 }
 
 /** Vertical padding applied to the centered title block inside [TitleAndActionsRow]. */
-private val SheetTitlePaddingVertical = 10.dp
+private val SheetTitlePaddingVertical = 12.dp
 
 /**
  * Single-row panel toolbar aligned with `upstream/coui17` (`Widget.COUI.Toolbar.Panel`):
@@ -1238,8 +1251,10 @@ private fun TitleAndActionsRow(
                                 color = COUITheme.colorScheme.onBackground,
                                 textAlign = TextAlign.Center,
                                 overflow = TextOverflow.Ellipsis,
-                                maxLines = 1,
-                                style = COUITheme.textStyles.title4,
+                                // Widget.COUI.Toolbar.Panel title: up to two lines, textFontWeight 550
+                                // (sans-serif-medium overridden by the inherited weight on API 28+).
+                                maxLines = 2,
+                                style = COUITheme.textStyles.title4.copy(fontWeight = FontWeight(550)),
                             )
                         }
                         if (subtitle != null) {
@@ -1297,25 +1312,30 @@ private suspend fun CoroutineScope.animateDismissOffScreen(
     dragOffsetY: Animatable<Float, *>,
     sheetHeightPx: Int,
     windowHeightPx: Float,
-    peekPx: Float,
     dimAlpha: MutableFloatState,
     velocity: Float = 0f,
     onDismiss: () -> Unit,
 ) {
     val sheetHeight = sheetHeightPx.toFloat()
-    val thresholdPx = if (sheetHeight > 0) sheetHeight else 500f
+    val startOffset = dragOffsetY.value
+    val startAlpha = dimAlpha.floatValue
+    // The scrim left over from the drag (parent-height divisor) fades out as the panel leaves.
+    val fadeSpanPx = (if (sheetHeight > 0) sheetHeight else windowHeightPx) - startOffset
+    // COUIBottomSheetBehavior.startSettleRunnable(STATE_HIDDEN): response 0.18 + 0.19 × the share
+    // of the parent still covered by the panel at release, so a panel dragged further leaves faster.
+    val remainingFraction = if (windowHeightPx > 0f && sheetHeight > 0f) {
+        ((sheetHeight - startOffset) / windowHeightPx).coerceIn(0f, 1f)
+    } else {
+        1f
+    }
     val settleJob = launch {
         dragOffsetY.animateTo(
             targetValue = windowHeightPx,
-            animationSpec = couiPanelSlideSpring(
-                entering = false,
-                travelPx = if (sheetHeight > 0) sheetHeight else windowHeightPx,
-                containerPx = windowHeightPx,
-                peekPx = peekPx,
-            ),
+            animationSpec = folmeSpring(damping = 1f, response = 0.18f + 0.19f * remainingFraction),
             initialVelocity = velocity,
         ) {
-            dimAlpha.floatValue = (1f - (value / thresholdPx).coerceIn(0f, 1f))
+            val progress = if (fadeSpanPx > 0f) ((value - startOffset) / fadeSpanPx).coerceIn(0f, 1f) else 1f
+            dimAlpha.floatValue = startAlpha * (1f - progress)
         }
     }
     snapshotFlow { dragOffsetY.value }
@@ -1570,12 +1590,15 @@ object BottomSheetDefaults {
     val DismissOffsetFraction = 0.5f
 
     /**
-     * The height of the title row, `coui_list_dialog_toolbar_height` = 50dp.
+     * The height of the title row, `toolbar_min_height` = 52dp for panel toolbars.
      *
      * A COUI panel's title bar is a `COUIToolbar` laid out at this fixed height, so the action
-     * buttons sit on the panel's vertical centre line rather than on a padding-derived row.
+     * buttons sit on the panel's vertical centre line rather than on a padding-derived row. With the
+     * 10dp top strip the buttons' centre lands 36dp below the panel edge, as measured on a ColorOS
+     * 17.0.1 phone (Clock's new-alarm panel). `COUIListBottomSheetDialog` alone uses 50dp
+     * (`coui_list_dialog_toolbar_height`).
      */
-    val HeaderHeight = 50.dp
+    val HeaderHeight = 52.dp
 
     /**
      * Height of the top transparent fading edge applied to scrolled sheet content.

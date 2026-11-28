@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,13 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
  * `coui_tiny_dialog_max_height` (352dp), drops both the 16dp side inset and the bottom margin
  * (the tiny background is a bare inset-free shape) and closes with the full-width tiny capsules of
  * `coui_center_alert_dialog_button_panel_tiny.xml`.
+ *
+ * [AlertDialogStyle.Bottom] is the same panel with window gravity `bottom` and
+ * `Animation.COUI.Dialog` (the 250ms slide up from below, 250ms slide out) on compact windows, and
+ * the centered presentation once the smallest window side reaches 480dp. That is what ColorOS 17
+ * apps do for confirmations on phones: Files 17.10.4 (`t8.f`: gravity 80 below sw480, centered
+ * Alpha style above), and the delete / repeat-alarm / account prompts of Files, Clock and the
+ * account center measured on a ColorOS 17.0.1 phone all sit at the bottom edge.
  *
  * `.Rotate`, `.ListDialog` and `.PhotoPage` are not ported. None of the system apps on the
  * reference build reference the first two; `.PhotoPage` pairs the *bottom* layout with center
@@ -84,6 +92,7 @@ internal fun AlertDialogContentLayout(
     neutralText: String? = null,
     onNeutral: (() -> Unit)? = null,
     recommendedButton: AlertDialogButton? = null,
+    dangerButton: AlertDialogButton? = null,
     style: AlertDialogStyle = AlertDialogStyle.Center,
     colors: AlertDialogColors = AlertDialogDefaults.alertDialogColors(),
     enableWindowDim: Boolean = true,
@@ -91,7 +100,9 @@ internal fun AlertDialogContentLayout(
     cornerRadius: Dp? = null,
     maxWidth: Dp = AlertDialogDefaults.MaxWidth,
     topInset: Dp? = null,
-    buttonColors: TextButtonColors = DialogButtonBarDefaults.buttonColors(),
+    // Null resolves inside the dialog: a window dialog only sees the host-window backdrop there,
+    // so a default taken in the host composition would always pick the unfrosted fill.
+    buttonColors: TextButtonColors? = null,
     recommendColors: TextButtonColors = ButtonDefaults.textButtonColorsPrimary(),
     content: (@Composable () -> Unit)? = null,
 ) {
@@ -99,30 +110,35 @@ internal fun AlertDialogContentLayout(
     val currentOnCancel by rememberUpdatedState(onCancel)
     val currentOnNeutral by rememberUpdatedState(onNeutral)
     val tiny = style == AlertDialogStyle.CenterTiny
+    val bottomOnCompact = style == AlertDialogStyle.Bottom
+    val windowSize = LocalWindowInfo.current.containerDpSize
+    val wideEnoughToCenter = minOf(windowSize.width, windowSize.height) >= AlertDialogDefaults.BottomStyleCenterMinWidth
 
+    // The danger action rides on the bar's recommend tier, recoloured inside the dialog below.
+    val highlighted = dangerButton ?: recommendedButton
     val requestCancel = remember { { currentOnCancel() } }
-    val cancelAction = remember(cancelText, requestCancel, recommendedButton) {
+    val cancelAction = remember(cancelText, requestCancel, highlighted) {
         DialogButtonBarAction(
             text = cancelText,
             onClick = requestCancel,
-            recommended = recommendedButton == AlertDialogButton.Negative,
+            recommended = highlighted == AlertDialogButton.Negative,
         )
     }
-    val confirmAction = remember(confirmText, recommendedButton) {
+    val confirmAction = remember(confirmText, highlighted) {
         DialogButtonBarAction(
             text = confirmText,
             onClick = { currentOnConfirm() },
-            recommended = recommendedButton == AlertDialogButton.Positive,
+            recommended = highlighted == AlertDialogButton.Positive,
         )
     }
     val neutralAction = if (neutralText == null) {
         null
     } else {
-        remember(neutralText, recommendedButton) {
+        remember(neutralText, highlighted) {
             DialogButtonBarAction(
                 text = neutralText,
                 onClick = { currentOnNeutral?.invoke() },
-                recommended = recommendedButton == AlertDialogButton.Neutral,
+                recommended = highlighted == AlertDialogButton.Neutral,
             )
         }
     }
@@ -150,8 +166,12 @@ internal fun AlertDialogContentLayout(
         defaultWindowInsetsPadding = !tiny,
         // `COUIAlertDialogBuilder` keeps the centered presentation on every window size, so the
         // large-screen auto switch of DialogContentLayout is bypassed.
-        forceCentered = !tiny,
-        largeScreen = if (tiny) false else null,
+        forceCentered = !tiny && !bottomOnCompact,
+        largeScreen = when {
+            tiny -> false
+            bottomOnCompact -> wideEnoughToCenter
+            else -> null
+        },
         maxWidth = maxWidth,
         cornerRadius = cornerRadius,
         bottomCornerRadius = if (tiny) 0.dp else null,
@@ -203,14 +223,20 @@ internal fun AlertDialogContentLayout(
                     else -> AlertDialogDefaults.ButtonBarMarginTop
                 },
             ),
-            colors = buttonColors,
-            recommendColors = recommendColors,
+            colors = buttonColors ?: DialogButtonBarDefaults.buttonColors(),
+            recommendColors = if (dangerButton != null) DialogButtonBarDefaults.dangerButtonColors() else recommendColors,
         )
     }
 }
 
 @ExperimentalCOUIApi
 object AlertDialogDefaults {
+
+    /**
+     * The smallest window side from which [AlertDialogStyle.Bottom] switches to the centered
+     * presentation (the sw480 split of ColorOS 17 Files).
+     */
+    val BottomStyleCenterMinWidth = 480.dp
 
     /** The default confirm (positive) button label. */
     val ConfirmText = "OK"
@@ -393,6 +419,12 @@ enum class AlertDialogStyle {
 
     /** `AlertDialogBuildStyle.Center.Tiny`: a compact panel pinned to the bottom edge. */
     CenterTiny,
+
+    /**
+     * `COUIAlertDialog.Bottom`: the regular panel at the bottom edge with the bottom slide on
+     * compact windows (smallest side below 480dp), centered on wider ones.
+     */
+    Bottom,
 }
 
 /**

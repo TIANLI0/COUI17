@@ -293,9 +293,11 @@ fun VerticalSlider(
 
     val progressAnimationSpec = remember(isDragging) {
         if (isDragging) {
-            spring(dampingRatio = 0.9f, stiffness = 1755f)
+            // COUISeekBarAdvanced.R0: drag-follow spring, bounce 0 / response 0.15.
+            spring(dampingRatio = 1f, stiffness = 1754.6f)
         } else {
-            spring<Float>(dampingRatio = 0.96f, stiffness = 322f)
+            // COUISeekBar click spring: CLICK_SPRING_RESPONSE 0.3, SPRING_BOUNCE 0.
+            spring<Float>(dampingRatio = 1f, stiffness = 438.65f)
         }
     }
 
@@ -601,9 +603,11 @@ fun RangeSlider(
 
     val progressAnimationSpec = remember(isDragging) {
         if (isDragging) {
-            spring(dampingRatio = 0.9f, stiffness = 1755f)
+            // COUISeekBarAdvanced.R0: drag-follow spring, bounce 0 / response 0.15.
+            spring(dampingRatio = 1f, stiffness = 1754.6f)
         } else {
-            spring<Float>(dampingRatio = 0.96f, stiffness = 322f)
+            // COUISeekBar click spring: CLICK_SPRING_RESPONSE 0.3, SPRING_BOUNCE 0.
+            spring<Float>(dampingRatio = 1f, stiffness = 438.65f)
         }
     }
 

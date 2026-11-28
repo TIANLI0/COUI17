@@ -49,7 +49,11 @@ import io.github.suqi8.coui.kmp.utils.rememberHostWindowBackdrop
  * @param recommendedButton The action drawn as the recommend (filled primary) button, matching the
  *   `boolean` overload of the native builder's button setters.
  * @param style The Center-family build style: [AlertDialogStyle.Center] floats the panel in the
- *   middle of the window, [AlertDialogStyle.CenterTiny] pins a compact panel to the bottom edge.
+ *   middle of the window, [AlertDialogStyle.CenterTiny] pins a compact panel to the bottom edge,
+ *   [AlertDialogStyle.Bottom] sits at the bottom edge on phones and centres on wider windows.
+ * @param dangerButton The action that deletes or discards something; its capsule keeps the
+ *   translucent fill and takes the red label (`color_delete_alert_dialog_button_warning_color`),
+ *   as Files' delete confirmation does. Takes precedence over [recommendedButton].
  * @param colors The [AlertDialogColors] of the title, message and panel.
  * @param enableWindowDim Whether to enable window dimming when the dialog is shown.
  * @param onDismissFinished The callback when the [WindowAlertDialog] is completely dismissed.
@@ -79,6 +83,7 @@ fun WindowAlertDialog(
     onDismissFinished: (() -> Unit)? = null,
     cornerRadius: Dp? = null,
     maxWidth: Dp = AlertDialogDefaults.MaxWidth,
+    dangerButton: AlertDialogButton? = null,
     content: (@Composable () -> Unit)? = null,
 ) {
     val statusBarsPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -117,6 +122,7 @@ fun WindowAlertDialog(
         neutralText = neutralText,
         onNeutral = onNeutral,
         recommendedButton = recommendedButton,
+        dangerButton = dangerButton,
         style = style,
         colors = colors,
         enableWindowDim = enableWindowDim,

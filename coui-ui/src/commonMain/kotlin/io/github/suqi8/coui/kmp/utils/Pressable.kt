@@ -141,7 +141,7 @@ internal inline fun Modifier.pressableWithIndicationIfNeeded(
  * How long to wait before appearing 'pressed' (emitting [PressInteraction.Press]) - if a touch down
  * will quickly become a drag / scroll, this timeout means that we don't show a press effect.
  */
-internal const val TAP_INDICATION_DELAY: Long = 150L
+internal const val TAP_INDICATION_DELAY: Long = 100L // AOSP ViewConfiguration.TAP_TIMEOUT
 
 private data class PressableElement(
     private val interactionSource: MutableInteractionSource?,

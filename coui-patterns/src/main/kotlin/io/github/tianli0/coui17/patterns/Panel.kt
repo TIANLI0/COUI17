@@ -49,6 +49,8 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
 import io.github.suqi8.coui.kmp.theme.LocalDismissState
 import io.github.suqi8.coui.kmp.utils.RemovePlatformDialogDefaultEffects
 import io.github.suqi8.coui.kmp.window.WindowAlertDialog
+import io.github.suqi8.coui.kmp.layout.AlertDialogStyle
+import io.github.suqi8.coui.kmp.layout.AlertDialogButton
 import io.github.suqi8.coui.kmp.window.WindowBottomSheet
 import io.github.suqi8.coui.kmp.window.WindowDialog
 
@@ -170,8 +172,11 @@ fun FullScreenDialog(onDismissRequest: () -> Unit, content: @Composable () -> Un
 }
 
 /**
- * The centred COUI17 confirmation for a write: title, one message, cancel | confirm. [content] adds
- * detail under the message (what exactly will change).
+ * The COUI17 confirmation for a write: title, one message, cancel | confirm. [content] adds detail
+ * under the message (what exactly will change). Set [destructive] when confirming deletes or
+ * discards something: the confirm label turns red, as in ColorOS Files. On phones it sits at the bottom edge and slides up,
+ * as ColorOS 17's own confirmations do (`AlertDialogStyle.Bottom`); from a 480dp smallest window
+ * side it is centred.
  */
 @Composable
 fun ConfirmDialog(
@@ -182,6 +187,7 @@ fun ConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     cancelText: String = stringResource(R.string.coui17_action_cancel),
+    destructive: Boolean = false,
     content: (@Composable () -> Unit)? = null,
 ) {
     WindowAlertDialog(
@@ -192,6 +198,8 @@ fun ConfirmDialog(
         summary = message,
         confirmText = confirmText,
         cancelText = cancelText,
+        style = AlertDialogStyle.Bottom,
+        dangerButton = if (destructive) AlertDialogButton.Positive else null,
         content = content,
     )
 }
@@ -200,10 +208,12 @@ fun ConfirmDialog(
 val DialogContentGutter = 24.dp
 
 /**
- * A centred dialog that asks for a value (a name, a line number, a credential): the title,
- * [content] at the dialog gutter, then the COUI17 button bar with cancel | [confirmText]. The
- * confirm capsule is disabled while [confirmEnabled] is false. Put a [TextInput] and, if needed, a
- * line of help or error text in [content]; for more than two fields use a [PanelSheet].
+ * A dialog that asks for a value (a name, a line number, a credential): the title, [content] at
+ * the dialog gutter, then the COUI17 button bar with cancel | [confirmText]. The confirm capsule is
+ * disabled while [confirmEnabled] is false. Put a [TextInput] and, if needed, a line of help or
+ * error text in [content]; for more than two fields use a [PanelSheet]. As in ColorOS 17, the
+ * fields take the underlined line form and the first one is focused with its text selected, so
+ * the keyboard opens with the dialog; on phones the dialog sits above it at the bottom edge.
  */
 @Composable
 fun FormDialog(
@@ -223,7 +233,8 @@ fun FormDialog(
                 Modifier.fillMaxWidth().padding(horizontal = DialogContentGutter, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                CompositionLocalProvider(LocalOnPageColor provides true) { content() }
+                val dialogField = remember { DialogFieldScope() }
+                CompositionLocalProvider(LocalOnPageColor provides false, LocalDialogField provides dialogField) { content() }
             }
             DialogButtonBar(
                 negative = DialogButtonBarAction(text = cancelText, onClick = onDismiss),

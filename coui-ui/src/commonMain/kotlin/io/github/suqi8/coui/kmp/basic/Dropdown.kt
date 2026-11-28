@@ -223,7 +223,9 @@ fun DropdownImpl(
                 item.summary?.let {
                     Text(
                         text = it,
-                        style = COUITheme.textStyles.body2,
+                        // Popup rows: couiTextBodyXS (12sp, COUI DefaultAdapter.setDescription); dialog
+                        // rows keep body2.
+                        style = if (dialogMode) COUITheme.textStyles.body2 else COUITheme.textStyles.footnote2,
                         color = summaryColor,
                         // COUI DefaultAdapter.setDescription.
                         maxLines = DropdownDefaults.SummaryMaxLines,
@@ -767,8 +769,10 @@ object DropdownDefaults {
     val HeaderMaxLines: Int = 2
 
     /**
-     * Default popup row colors, matching COUI coui_popup_list_window_item_tint_selector
-     * (default couiColorLabelPrimary, selected couiColorLabelTheme, disabled couiColorLabelTertiary).
+     * Default popup row colors, matching COUI 17 coui_popup_list_window_item_tint_selector
+     * (default and selected couiColorLabelPrimary, disabled couiColorLabelTertiary): the selected row
+     * is marked by the neutral check alone, not by an accent colour (Files 17.10.4, and the ColorOS
+     * 17.0.1 Files sort menu on device).
      * Summaries always use couiColorLabelSecondary, and row containers stay transparent —
      * the popup surface provides the fill.
      */
@@ -777,10 +781,10 @@ object DropdownDefaults {
         contentColor: Color = COUITheme.colorScheme.onSurfaceContainer,
         summaryColor: Color = COUITheme.colorScheme.onSurfaceSecondary,
         containerColor: Color = Color.Transparent,
-        selectedContentColor: Color = COUITheme.colorScheme.primary,
+        selectedContentColor: Color = COUITheme.colorScheme.onSurfaceContainer,
         selectedSummaryColor: Color = COUITheme.colorScheme.onSurfaceSecondary,
         selectedContainerColor: Color = Color.Transparent,
-        selectedIndicatorColor: Color = COUITheme.colorScheme.primary,
+        selectedIndicatorColor: Color = COUITheme.colorScheme.onSurfaceContainer,
         disabledContentColor: Color = COUITheme.colorScheme.disabledOnSecondaryVariant,
         alertContentColor: Color = COUITheme.colorScheme.error,
         headerColor: Color = COUITheme.colorScheme.onSurfaceSecondary,
