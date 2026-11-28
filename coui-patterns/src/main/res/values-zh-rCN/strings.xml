@@ -3,6 +3,7 @@
     <string name="coui17_action_back">返回</string>
     <string name="coui17_action_cancel">取消</string>
     <string name="coui17_action_close">关闭</string>
+    <string name="coui17_action_clear">清除</string>
     <string name="coui17_state_expanded">已展开</string>
     <string name="coui17_state_collapsed">已收起</string>
 </resources>

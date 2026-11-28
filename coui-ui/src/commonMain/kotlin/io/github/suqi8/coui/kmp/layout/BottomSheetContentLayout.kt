@@ -775,7 +775,9 @@ private fun BottomSheetColumn(
     val effectiveMaxWidth = remember(windowSize, sheetMaxWidth) {
         min(sheetMaxWidth, couiPanelMaxWidth(windowSize))
     }
-    val maxSheetHeight = windowHeight - topInset
+    // A panel full of content stops a little below the status bar instead of butting against it,
+    // so its rounded top edge and toolbar read as a sheet over the page, not part of the bar.
+    val maxSheetHeight = windowHeight - topInset - BottomSheetDefaults.MaxHeightTopGap
     // ColorOS 17 frosts every panel: `COUIBottomSheetDialog.initBlurParams()` feeds
     // `COUIBackgroundBlurBuilder` the two-tone recipe `coui_bottomdialog_list_mix_blur_*` +
     // `coui_bottomdialog_list_blend_blur_*` at `coui_bottomdialog_blur_radius`, and
@@ -1599,6 +1601,9 @@ object BottomSheetDefaults {
      * (`coui_list_dialog_toolbar_height`).
      */
     val HeaderHeight = 52.dp
+
+    /** The room a panel of maximum height leaves between its top edge and the status bar. */
+    val MaxHeightTopGap = 8.dp
 
     /**
      * Height of the top transparent fading edge applied to scrolled sheet content.

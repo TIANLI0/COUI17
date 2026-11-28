@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.RectangleShape
@@ -251,16 +252,29 @@ fun Page(
                 )
                 if (strongHeader) {
                     // Behind the (transparent) title bar, over the list: full strength under the
-                    // bar, gone a little below it. It takes no touches.
+                    // bar, gone a little below it. It takes no touches. Like ColorOS's scroll-driven
+                    // AppBarBlurOverlay it fades in as the list leaves the top: at rest nothing sits
+                    // under the bar, so the material would only haze the first row (repository chips,
+                    // a filter) and end in a visible edge across it.
                     CompositionLocalProvider(LocalGlassBackdrop provides barBackdrop) {
                         val band = top + PageDefaults.HeaderFade
-                        Box(Modifier.fillMaxWidth().height(band).glassHeader(color, top / band))
+                        val fadePx = with(LocalDensity.current) { HeaderMaterialFadeDistance.toPx() }
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(band)
+                                .graphicsLayer { alpha = (-behavior.state.contentOffset / fadePx).coerceIn(0f, 1f) }
+                                .glassHeader(color, top / band),
+                        )
                     }
                 }
             }
         }
     }
 }
+
+/** How far the list scrolls before the strong header material reaches full strength. */
+private val HeaderMaterialFadeDistance = 24.dp
 
 /**
  * The back key of a detail page: the COUI17 glass round key of the top bar. The arrow points to

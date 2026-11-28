@@ -272,6 +272,11 @@ from its status text, and `Pressable` waits 100ms before showing a press.
 `LocalDropdownCheckIcon` lets a selected popup row draw another mark in place of the check, such as
 the ↑ / ↓ the ColorOS 17 Files sort menu shows on the active key.
 
+### 0028 — panel maximum height gap
+
+A panel of maximum height leaves `BottomSheetDefaults.MaxHeightTopGap` (8dp) between its top edge
+and the status bar instead of butting against it.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on
