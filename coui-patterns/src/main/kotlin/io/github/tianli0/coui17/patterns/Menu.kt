@@ -22,12 +22,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.runtime.CompositionLocalProvider
 import io.github.suqi8.coui.kmp.basic.DropdownImpl
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.size
-import io.github.suqi8.coui.kmp.theme.COUITheme
-import io.github.suqi8.coui.kmp.basic.Icon
+import io.github.suqi8.coui.kmp.basic.LocalDropdownCheckIcon
 import androidx.compose.ui.graphics.vector.ImageVector
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.ListPopupColumn
@@ -37,8 +34,8 @@ import io.github.suqi8.coui.kmp.window.WindowListPopup
 
 /**
  * One row of a [GlassMenu]. [selected] shows the check mark; [danger] paints the label red.
- * [trailingIcon] sits at the row's end before the check (COUI's hint slot), e.g. the ↑ / ↓ that
- * ColorOS Files puts on the active sort key instead of a check.
+ * [trailingIcon] replaces the check at the row's end and shows whenever it is set, e.g. the ↑ / ↓
+ * that ColorOS Files puts on the active sort key instead of a check.
  */
 data class MenuEntry(
     val text: String,
@@ -73,36 +70,24 @@ fun GlassMenu(show: Boolean, entries: List<MenuEntry>, onDismiss: () -> Unit, to
         ListPopupColumn {
             entries.forEachIndexed { index, entry ->
                 val trailing = entry.trailingIcon
-                val item = remember(entry.text, entry.enabled, entry.danger, trailing) {
-                    DropdownItem(
-                        text = entry.text,
-                        enabled = entry.enabled,
-                        alert = entry.danger,
-                        hint = trailing?.let { icon ->
-                            {
-                                Icon(
-                                    icon,
-                                    contentDescription = null,
-                                    tint = COUITheme.colorScheme.onSurfaceContainer,
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                val item = remember(entry.text, entry.enabled, entry.danger) {
+                    DropdownItem(text = entry.text, enabled = entry.enabled, alert = entry.danger)
+                }
+                CompositionLocalProvider(LocalDropdownCheckIcon provides trailing) {
+                    DropdownImpl(
+                        item = item,
+                        optionSize = entries.size,
+                        isSelected = entry.selected || trailing != null,
+                        index = index,
+                        // Rows of one group stay contiguous: COUI reserves a divider band only where the group changes.
+                        groupKey = MenuGroup,
+                        role = Role.Button,
+                        onSelectedIndexChange = {
+                            onDismiss()
+                            entry.onClick()
                         },
                     )
                 }
-                DropdownImpl(
-                    item = item,
-                    optionSize = entries.size,
-                    isSelected = entry.selected,
-                    index = index,
-                    // Rows of one group stay contiguous: COUI reserves a divider band only where the group changes.
-                    groupKey = MenuGroup,
-                    role = Role.Button,
-                    onSelectedIndexChange = {
-                        onDismiss()
-                        entry.onClick()
-                    },
-                )
             }
         }
     }

@@ -267,6 +267,11 @@ tint and scale use the `PressParams` springs, the slider uses the 0.3 / 0.15 spr
 snackbar keeps 88 / 64 / 32dp from the bottom by window height, the preference arrow keeps 4dp
 from its status text, and `Pressable` waits 100ms before showing a press.
 
+### 0027 — dropdown check icon
+
+`LocalDropdownCheckIcon` lets a selected popup row draw another mark in place of the check, such as
+the ↑ / ↓ the ColorOS 17 Files sort menu shows on the active key.
+
 **Every change to the upstream-owned paths must be a patch here.** The sync replaces those paths
 wholesale, so an edit made directly to them is reverted by the next sync. `tools/check_patches.py`
 rebuilds upstream at `UPSTREAM_SHA` plus the patches and fails on any difference; CI runs it on

@@ -22,6 +22,8 @@ import androidx.compose.runtime.NonRestartableComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -265,13 +267,20 @@ fun DropdownImpl(
             }
             Image(
                 modifier = if (hint != null) HintedCheckIconModifier else CheckIconBaseModifier,
-                imageVector = COUIIcons.Basic.Check,
+                imageVector = LocalDropdownCheckIcon.current ?: COUIIcons.Basic.Check,
                 colorFilter = checkColorFilter,
                 contentDescription = null,
             )
         }
     }
 }
+
+/**
+ * The mark a selected [DropdownImpl] row draws at its end, in place of the check. The ColorOS 17
+ * Files sort menu shows the active key's ↑ / ↓ there (seen on a ColorOS 17.0.1 phone). Null keeps
+ * the check.
+ */
+val LocalDropdownCheckIcon = staticCompositionLocalOf<ImageVector?> { null }
 
 @Composable
 fun DropdownImpl(
